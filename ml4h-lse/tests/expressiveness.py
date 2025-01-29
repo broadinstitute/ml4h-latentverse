@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tests.probing import fit_logistic, fit_linear
 
-def expressiveness_test(representations, phenotypes, folds=4, train_ratio=0.6, percent_to_remove_list=[0, 5, 10, 20], verbose=False, plots=True):
+def run_expressiveness(representations, phenotypes, folds=4, train_ratio=0.6, percent_to_remove_list=[0, 5, 10, 20], verbose=False, plots=True):
     results = {}
     plt.figure(figsize=(8, 6))
 

@@ -2,7 +2,8 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression, Lasso
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
-from sklearn.metrics import roc_auc_score, entropy
+from sklearn.metrics import roc_auc_score
+from scipy.stats import entropy
 from tests.probing import fit_logistic, fit_linear
 
 def estimate_intrinsic_dimension(embeddings, k=5):    
@@ -14,7 +15,7 @@ def estimate_intrinsic_dimension(embeddings, k=5):
         id_estimate = (k - 1) / np.mean(log_ratios)
         return id_estimate
 
-def disentanglement_test(representations, phenotypes):
+def run_disentanglement(representations, phenotypes):
     results = {"DCI": {}, "SAP": {}, "MIG": {}, "TC": {}}
 
     for phenotype in phenotypes.columns:
