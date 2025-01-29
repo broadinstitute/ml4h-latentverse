@@ -4,7 +4,7 @@ from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import roc_auc_score
 from scipy.stats import entropy
-from tests.probing import fit_logistic, fit_linear
+from ml4h_lse.tests.probing import fit_logistic, fit_linear
 
 def estimate_intrinsic_dimension(embeddings, k=5):    
         nbrs = NearestNeighbors(n_neighbors=k + 1).fit(embeddings)

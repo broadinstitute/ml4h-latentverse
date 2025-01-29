@@ -1,5 +1,8 @@
-from tests.clustering import run_clustering
-from tests.disentanglement import run_disentanglement
-from tests.expressiveness import run_expressiveness
-from tests.robustness import run_robustness_silhouette, run_robustness_probing
-from tests.probing import run_probing
+from ml4h_lse.tests import (
+    run_clustering,
+    run_disentanglement,
+    run_expressiveness,
+    run_robustness_silhouette,
+    run_robustness_probing,
+    run_probing,
+)

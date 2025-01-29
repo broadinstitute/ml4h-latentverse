@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
-from tests.probing import fit_logistic, fit_linear
+from ml4h_lse.tests.probing import fit_logistic, fit_linear
 
 def run_robustness_silhouette(representations, phenotypes, noise_levels, num_clusters=2):
     noisy_scores = {phenotype: [] for phenotype in phenotypes.columns}
