@@ -4,7 +4,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from tests.probing import fit_logistic, fit_linear
 
-def perturbation_test_silhouette(representations, phenotypes, noise_levels, num_clusters=2):
+def run_robustness_silhouette(representations, phenotypes, noise_levels, num_clusters=2):
     noisy_scores = {phenotype: [] for phenotype in phenotypes.columns}
 
     for phenotype in phenotypes.columns:
@@ -47,7 +47,7 @@ def perturbation_test_silhouette(representations, phenotypes, noise_levels, num_
     return results
 
 
-def perturbation_test_probing(representations, phenotypes, noise_levels, folds=4, train_ratio=0.6, verbose=False):
+def run_robustness_probing(representations, phenotypes, noise_levels, folds=4, train_ratio=0.6, verbose=False):
     results = {phenotype: {'auc': [], 'r2': []} for phenotype in phenotype.columns}
 
     for phenotype in phenotype.columns:

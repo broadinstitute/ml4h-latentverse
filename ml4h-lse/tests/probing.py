@@ -12,7 +12,7 @@ from sklearn.metrics import (
     mean_gamma_deviance, median_absolute_error
 )
 
-def fit_logistic(self, label_header, X_train, X_test, y_train, y_test, verbose=False):
+def fit_logistic(label_header, X_train, X_test, y_train, y_test, verbose=False):
         if verbose:
             print(f'{label_header} len train {len(X_train)} len test {len(X_test)}')
             print(f'\nTrain:\n{pd.Series(y_train).value_counts()} \n\nTest:\n{pd.Series(y_test).value_counts()}')
@@ -40,7 +40,7 @@ def fit_logistic(self, label_header, X_train, X_test, y_train, y_test, verbose=F
             print(f"Sparsity: {sparsity}")
         return metrics
 
-def fit_linear(self, label_header, X_train, X_test, y_train, y_test, verbose=False):
+def fit_linear(label_header, X_train, X_test, y_train, y_test, verbose=False):
     if verbose:
         print(f'{label_header} len train {len(X_train)} len test {len(X_test)}')
         print(f'\nTrain:\n{pd.Series(y_train).value_counts()} \n\nTest:\n{pd.Series(y_test).value_counts()}')
@@ -66,7 +66,7 @@ def fit_linear(self, label_header, X_train, X_test, y_train, y_test, verbose=Fal
         print(f"Metrics for {label_header} (Linear Regression):", metrics)
     return metrics
 
-def probing_test(representations, phenotypes, folds=4, train_ratio=0.6, verbose=False):
+def run_probing(representations, phenotypes, folds=4, train_ratio=0.6, verbose=False):
     scores = {}
     errors = {}
     
