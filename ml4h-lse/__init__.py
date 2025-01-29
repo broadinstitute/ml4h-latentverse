@@ -1,1 +1,5 @@
-from . import tests
+from tests.clustering import run_clustering
+from tests.disentanglement import run_disentanglement
+from tests.expressiveness import run_expressiveness
+from tests.robustness import run_robustness_silhouette, run_robustness_probing
+from tests.probing import run_probing
