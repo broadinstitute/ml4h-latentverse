@@ -6,7 +6,7 @@ setup(
     author="Yoanna Turura",
     author_email="yturura@broadinstitute.org",
     description="A library for evaluating self-supervised representations in ML",
-    packages=find_packages(),
+    packages=find_packages(include=["ml4h_lse", "ml4h_lse.tests", "ml4h_lse.utils"]),
     install_requires=[
         "numpy",
         "matplotlib",
