@@ -6,7 +6,7 @@ from sklearn.metrics import silhouette_score, normalized_mutual_info_score, davi
 from sklearn.neighbors import KNeighborsClassifier
 
 
-def run_clustering(representations, phenotypes, num_clusters, plot=False):
+def run_clustering(representations, phenotypes, num_clusters, plots=False):
     results = {}
 
     for phenotype in phenotypes.columns:
@@ -36,7 +36,7 @@ def run_clustering(representations, phenotypes, num_clusters, plot=False):
             'Cluster Learnability': cl_score
         }
 
-        if plot:
+        if plots:
             visualize_clusterings(representations, cluster_labels, num_clusters, phenotypes, phenotype)
 
     print(results)
