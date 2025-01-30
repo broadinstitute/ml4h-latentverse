@@ -19,21 +19,21 @@ def run_robustness_silhouette(representations, phenotypes, noise_levels, num_clu
             except Exception as e:
                 print(f"Error computing silhouette score for {phenotype} at noise level {noise_level}: {e}")
                 noisy_scores[phenotype].append(None)
-    if plots:
-        for phenotype, scores in noisy_scores.items():
-            if scores:
-                plt.plot(
-                    noise_levels,
-                    scores,
-                    marker='o',
-                    label=f'{phenotype}'
-                )
-    plt.xlabel('Noise Level', fontsize=14)
-    plt.ylabel('Silhouette Score', fontsize=14)
-    plt.title('Silhouette Score under Perturbation', fontsize=16)
-    plt.legend(title="Phenotype", loc='best')
-    plt.grid()
-    plt.show()
+        if plots:
+            for phenotype, scores in noisy_scores.items():
+                if scores:
+                    plt.plot(
+                        noise_levels,
+                        scores,
+                        marker='o',
+                        label=f'{phenotype}'
+                    )
+        plt.xlabel('Noise Level', fontsize=14)
+        plt.ylabel('Silhouette Score', fontsize=14)
+        plt.title('Silhouette Score under Perturbation', fontsize=16)
+        plt.legend(title="Phenotype", loc='best')
+        plt.grid()
+        plt.show()
 
     results = {
         phenotype: {
@@ -83,17 +83,17 @@ def run_robustness_probing(representations, phenotypes, noise_levels, folds=4, t
 
         except Exception as e:
             print(f"Error in perturbation test for phenotype '{phenotype}': {e}")
-    if plots:
-        for phenotype, metrics in results.items():
-            if metrics['auc']:
-                plt.plot(noise_levels, metrics['auc'], marker='o', label=f'{phenotype} (AUC)')
-            if metrics['r2']:
-                plt.plot(noise_levels, metrics['r2'], marker='s', label=f'{phenotype} (R²)')
-    plt.xlabel('Noise Level', fontsize=14)
-    plt.ylabel('Metric Score (AUC or R²)', fontsize=14)
-    plt.title('Probing under Perturbation', fontsize=16)
-    plt.legend(title="Phenotype", loc='best')
-    plt.grid()
-    plt.show()
+        if plots:
+            for phenotype, metrics in results.items():
+                if metrics['auc']:
+                    plt.plot(noise_levels, metrics['auc'], marker='o', label=f'{phenotype} (AUC)')
+                if metrics['r2']:
+                    plt.plot(noise_levels, metrics['r2'], marker='s', label=f'{phenotype} (R²)')
+        plt.xlabel('Noise Level', fontsize=14)
+        plt.ylabel('Metric Score (AUC or R²)', fontsize=14)
+        plt.title('Probing under Perturbation', fontsize=16)
+        plt.legend(title="Phenotype", loc='best')
+        plt.grid()
+        plt.show()
 
     return results
