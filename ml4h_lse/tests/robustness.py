@@ -45,7 +45,7 @@ def run_robustness_silhouette(representations, phenotypes, noise_levels, num_clu
 
 
 def run_robustness_probing(representations, phenotypes, noise_levels, folds=4, train_ratio=0.6, verbose=False, plots=True):
-    results = {phenotype: {'auc': [], 'r2': []} for phenotype in phenotype.columns}
+    results = {phenotype: {'auc': [], 'r2': []} for phenotype in phenotypeS.columns}
     plt.figure(figsize=(8, 6))
     
     for phenotype in phenotypes.columns:
