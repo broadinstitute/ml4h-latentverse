@@ -4,7 +4,6 @@ from ml4h_lse.tests.probing import fit_logistic, fit_linear
 
 def run_expressiveness(representations, phenotypes, folds=4, train_ratio=0.6, percent_to_remove_list=[0, 5, 10, 20], verbose=False, plots=True):
     results = {}
-    plt.figure(figsize=(8, 6))
 
     for phenotype in phenotype.columns:
         try:
@@ -63,21 +62,22 @@ def run_expressiveness(representations, phenotypes, folds=4, train_ratio=0.6, pe
             results[phenotype] = mean_scores
 
             if plots:
+                plt.figure(figsize=(8, 6))
                 plt.plot(
                     percent_to_remove_list,
                     [mean_scores[percent] for percent in percent_to_remove_list],
                     marker='o',
                     label=f'{phenotype}'
                 )
+                plt.xlabel("Percentage of Dimensions Removed", fontsize=14)
+                plt.ylabel("Metric Score (AUC or R²)", fontsize=14)
+                plt.title("Expressiveness Test Across Phenotypes", fontsize=16)
+                plt.legend(title="Phenotype")
+                plt.grid()
+                plt.show()
 
         except Exception as e:
             print(f"Error in expressiveness test for phenotype '{phenotype}': {e}")
 
-    plt.xlabel("Percentage of Dimensions Removed", fontsize=14)
-    plt.ylabel("Metric Score (AUC or R²)", fontsize=14)
-    plt.title("Expressiveness Test Across Phenotypes", fontsize=16)
-    plt.legend(title="Phenotype")
-    plt.grid()
-    plt.show()
-
+    print(results)
     return results
