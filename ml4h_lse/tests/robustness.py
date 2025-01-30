@@ -48,7 +48,7 @@ def run_robustness_probing(representations, phenotypes, noise_levels, folds=4, t
     results = {phenotype: {'auc': [], 'r2': []} for phenotype in phenotype.columns}
     plt.figure(figsize=(8, 6))
     
-    for phenotype in phenotype.columns:
+    for phenotype in phenotypes.columns:
         try:
             full_data = phenotypes[phenotypes[phenotype].notna()]
             embeddings = representations[full_data.index]

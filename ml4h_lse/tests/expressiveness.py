@@ -5,7 +5,7 @@ from ml4h_lse.tests.probing import fit_logistic, fit_linear
 def run_expressiveness(representations, phenotypes, folds=4, train_ratio=0.6, percent_to_remove_list=[0, 5, 10, 20], verbose=False, plots=True):
     results = {}
 
-    for phenotype in phenotype.columns:
+    for phenotype in phenotypes.columns:
         try:
             full_data = phenotypes[phenotypes[phenotype].notna()]
             embeddings = representations[full_data.index]
