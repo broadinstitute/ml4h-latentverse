@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+plt.use('Agg')
 import seaborn as sns
 sns.set()
 from sklearn.cluster import KMeans
