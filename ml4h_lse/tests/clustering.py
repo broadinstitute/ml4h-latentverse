@@ -6,6 +6,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, normalized_mutual_info_score, davies_bouldin_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.decomposition import PCA
+import os
 
 
 def run_clustering(representations, num_clusters=None, labels=None, plots=False):
@@ -47,10 +48,11 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     }
 
     # Optional visualization
+    plot_url = None
     if plots:
-        visualize_clusterings(representations, cluster_labels, num_clusters, labels)
+        plot_url = visualize_clusterings(representations, cluster_labels, num_clusters, labels)
 
-    return results
+    return {"results": results, "plot_url": plot_url}
 
 
 def visualize_clusterings(representations, cluster_labels, num_clusters, labels):
@@ -99,4 +101,10 @@ def visualize_clusterings(representations, cluster_labels, num_clusters, labels)
     plt.grid(True)
     plt.legend(title="Legend", loc='best', bbox_to_anchor=(1.05, 1))
     plt.tight_layout()
-    plt.show()
+    plot_filename = f"clustering_plot.png"
+    plot_filepath = os.path.join("static/plots", plot_filename)
+    plt.savefig(plot_filepath, format="png")
+    plt.close()
+
+    return f"/static/plots/{plot_filename}"
+
