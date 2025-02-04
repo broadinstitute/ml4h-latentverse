@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set()
@@ -66,6 +68,8 @@ def visualize_clusterings(representations, cluster_labels, num_clusters, labels)
         labels (ndarray): Ground truth labels for color mapping.
 
     """
+    matplotlib.use('Agg')
+
     markers = ['o', 's', '^', 'P', '*', 'X', 'D', 'v', '<', '>', 'h', 'H', '+', 'x', 'd', '|', '_', '8', '1', '2']
     if num_clusters > len(markers):
         raise ValueError(f"Number of clusters ({num_clusters}) exceeds available markers ({len(markers)}).")
