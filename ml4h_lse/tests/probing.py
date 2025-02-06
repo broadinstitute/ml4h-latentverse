@@ -86,9 +86,11 @@ def run_probing(representations, labels, train_ratio=0.6):
 
     # Filter out NaNs
     mask = ~np.isnan(labels)
-    labels, representations = labels[mask], representations[mask, :]
+    labels, representations = labels[mask], representations[mask]
 
     # Train/Test split
+    if representations.ndim > 2:
+        representations = representations.reshape(representations.shape[0], -1)    
     X_train, X_test, y_train, y_test = train_test_split(representations, labels, train_size=train_ratio, random_state=42)
 
     # Convert to torch tensors
