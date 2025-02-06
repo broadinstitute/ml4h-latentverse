@@ -10,10 +10,12 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import accuracy_score, roc_auc_score, r2_score
 from sklearn.model_selection import train_test_split
 
+# Create directory for plots if not exists
 PLOTS_DIR = "static/plots"
 if not os.path.exists(PLOTS_DIR):
     os.makedirs(PLOTS_DIR)
 
+### Define MLP Models ###
 class SimpleLinear(nn.Module):
     def __init__(self, input_dim):
         super(SimpleLinear, self).__init__()
@@ -29,15 +31,29 @@ class MLP(nn.Module):
         for i in range(len(hidden_layers)):
             layers.append(nn.Linear(input_dim if i == 0 else hidden_layers[i - 1], hidden_layers[i]))
             layers.append(nn.ReLU())
-        layers.append(nn.Linear(hidden_layers[-1], 1))
+        layers.append(nn.Linear(hidden_layers[-1], 1))  # Output layer
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.model(x)
 
-
+### Training Function ###
 def train_model(X_train, y_train, X_test, y_test, model, loss_fn, epochs=50):
+    """
+    Trains a PyTorch model on the given dataset.
+
+    Parameters:
+    - X_train, y_train: Training data
+    - X_test, y_test: Testing data
+    - model: PyTorch model instance
+    - loss_fn: Loss function (MSE or BCEWithLogits)
+    - epochs: Number of training iterations
+
+    Returns:
+    - Predictions on X_test
+    """
     optimizer = optim.Adam(model.parameters(), lr=0.01)
+
     for _ in range(epochs):
         optimizer.zero_grad()
         outputs = model(X_train).squeeze()
@@ -47,11 +63,11 @@ def train_model(X_train, y_train, X_test, y_test, model, loss_fn, epochs=50):
     
     with torch.no_grad():
         preds = model(X_test).squeeze()
-    
+
     return preds
 
-
-def run_probing(representations, labels, train_ratio=0.6, verbose=False):
+### Run Probing Function ###
+def run_probing(representations, labels, train_ratio=0.6):
     """
     Evaluates representation quality by training probes of different complexity.
 
@@ -59,21 +75,27 @@ def run_probing(representations, labels, train_ratio=0.6, verbose=False):
         representations (ndarray): Feature representations.
         labels (ndarray): Labels for probing.
         train_ratio (float): Ratio of train to test data.
-        verbose (bool): Whether to print details.
 
     Returns:
         dict: Performance metrics and plot URL.
     """
+    # Ensure representations are at least 2D
+    representations = np.asarray(representations)
+    if representations.ndim == 1:
+        representations = representations.reshape(-1, 1)
+
     # Filter out NaNs
     mask = ~np.isnan(labels)
-    labels, representations = labels[mask], representations[mask]
+    labels, representations = labels[mask], representations[mask, :]
 
     # Train/Test split
     X_train, X_test, y_train, y_test = train_test_split(representations, labels, train_size=train_ratio, random_state=42)
 
     # Convert to torch tensors
-    X_train_t, X_test_t = torch.tensor(X_train, dtype=torch.float32), torch.tensor(X_test, dtype=torch.float32)
-    y_train_t, y_test_t = torch.tensor(y_train, dtype=torch.float32), torch.tensor(y_test, dtype=torch.float32)
+    X_train_t = torch.tensor(X_train, dtype=torch.float32)
+    X_test_t = torch.tensor(X_test, dtype=torch.float32)
+    y_train_t = torch.tensor(y_train, dtype=torch.float32)
+    y_test_t = torch.tensor(y_test, dtype=torch.float32)
 
     # Define models with increasing complexity
     model_configs = {
@@ -82,6 +104,9 @@ def run_probing(representations, labels, train_ratio=0.6, verbose=False):
         "5-layer MLP": MLP(X_train.shape[1], [64, 32, 32, 16, 8]),
         "10-layer MLP": MLP(X_train.shape[1], [128] + [64]*4 + [32]*4)
     }
+
+    # Determine if classification (binary) or regression task
+    is_categorical = len(np.unique(labels)) <= 2
 
     # Initialize performance tracking
     metrics = {"Model Complexity": [], "AUROC": [], "Accuracy": [], "R²": []}
@@ -92,12 +117,16 @@ def run_probing(representations, labels, train_ratio=0.6, verbose=False):
             model.fit(X_train, y_train)
             preds = model.predict(X_test)
         else:  # MLP models
-            loss_fn = nn.MSELoss() if len(np.unique(labels)) > 2 else nn.BCEWithLogitsLoss()
+            loss_fn = nn.BCEWithLogitsLoss() if is_categorical else nn.MSELoss()
             preds = train_model(X_train_t, y_train_t, X_test_t, y_test_t, model, loss_fn)
+        
+            # Ensure preds is a NumPy array
+            if isinstance(preds, torch.Tensor):
+                preds = preds.detach().cpu().numpy().squeeze()
 
         # Compute metrics
-        auroc = roc_auc_score(y_test, preds) if len(np.unique(labels)) == 2 else None
-        acc = accuracy_score(y_test, preds.round()) if len(np.unique(labels)) == 2 else None
+        auroc = roc_auc_score(y_test, preds) if is_categorical else None
+        acc = accuracy_score(y_test, preds.round()) if is_categorical else None
         r2 = r2_score(y_test, preds)
 
         # Store metrics
@@ -106,7 +135,7 @@ def run_probing(representations, labels, train_ratio=0.6, verbose=False):
         metrics["Accuracy"].append(acc)
         metrics["R²"].append(r2)
 
-    # Generate plot
+    ### Generate Plot ###
     plot_filename = "probing_complexity.png"
     plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
     
