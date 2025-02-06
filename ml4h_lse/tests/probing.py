@@ -1,132 +1,162 @@
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import (
-    roc_auc_score, accuracy_score, average_precision_score, 
-    f1_score, precision_score, recall_score, log_loss, 
-    balanced_accuracy_score, brier_score_loss, mean_squared_error, 
-    mean_absolute_error, explained_variance_score, r2_score, 
-    max_error, mean_absolute_percentage_error, median_absolute_error
-)
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from sklearn.linear_model import Ridge
+from sklearn.metrics import accuracy_score, roc_auc_score, r2_score
+from sklearn.model_selection import train_test_split
 
-def fit_logistic(X_train, X_test, y_train, y_test, verbose=False):
+# Create directory for plots if not exists
+PLOTS_DIR = "static/plots"
+if not os.path.exists(PLOTS_DIR):
+    os.makedirs(PLOTS_DIR)
+
+### Define MLP Models ###
+class SimpleLinear(nn.Module):
+    def __init__(self, input_dim):
+        super(SimpleLinear, self).__init__()
+        self.fc = nn.Linear(input_dim, 1)
+
+    def forward(self, x):
+        return self.fc(x)
+
+class MLP(nn.Module):
+    def __init__(self, input_dim, hidden_layers):
+        super(MLP, self).__init__()
+        layers = []
+        for i in range(len(hidden_layers)):
+            layers.append(nn.Linear(input_dim if i == 0 else hidden_layers[i - 1], hidden_layers[i]))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_layers[-1], 1))  # Output layer
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.model(x)
+
+### Training Function ###
+def train_model(X_train, y_train, X_test, y_test, model, loss_fn, epochs=50):
     """
-    Train a logistic regression model and evaluate classification metrics.
+    Trains a PyTorch model on the given dataset.
 
     Parameters:
-    - X_train, X_test: Feature sets for training and testing
-    - y_train, y_test: Corresponding labels
-    - verbose: If True, prints dataset details and results
+    - X_train, y_train: Training data
+    - X_test, y_test: Testing data
+    - model: PyTorch model instance
+    - loss_fn: Loss function (MSE or BCEWithLogits)
+    - epochs: Number of training iterations
 
     Returns:
-    - Dictionary containing classification performance metrics
+    - Predictions on X_test
     """
-    if verbose:
-        print(f"Train size: {len(X_train)}, Test size: {len(X_test)}")
-        print(f"\nTrain label distribution:\n{pd.Series(y_train).value_counts()}")
-        print(f"\nTest label distribution:\n{pd.Series(y_test).value_counts()}")
+    optimizer = optim.Adam(model.parameters(), lr=0.01)
 
-    clf = LogisticRegression(penalty="elasticnet", solver="saga", class_weight="balanced", l1_ratio=0.5)
-    clf.fit(X_train, y_train)
-
-    y_pred = clf.predict(X_test)
-    y_pred_proba = clf.predict_proba(X_test)[:, 1]
+    for _ in range(epochs):
+        optimizer.zero_grad()
+        outputs = model(X_train).squeeze()
+        loss = loss_fn(outputs, y_train)
+        loss.backward()
+        optimizer.step()
     
-    metrics = {
-        "AUROC": roc_auc_score(y_test, y_pred_proba),
-        "AUPRC": average_precision_score(y_test, y_pred_proba),
-        "Accuracy": accuracy_score(y_test, y_pred),
-        "F1": f1_score(y_test, y_pred),
-        "Precision": precision_score(y_test, y_pred),
-        "Recall": recall_score(y_test, y_pred),
-        "Log Loss": log_loss(y_test, y_pred_proba),
-        "Balanced Accuracy": balanced_accuracy_score(y_test, y_pred),
-        "Neg Brier Score": -brier_score_loss(y_test, y_pred_proba),
-    }
+    with torch.no_grad():
+        preds = model(X_test).squeeze()
 
-    if verbose:
-        print("Logistic Regression Metrics:", metrics)
+    return preds
 
-    return metrics
-
-
-def fit_linear(X_train, X_test, y_train, y_test, verbose=False):
+### Run Probing Function ###
+def run_probing(representations, labels, train_ratio=0.6):
     """
-    Train a Ridge regression model and evaluate regression metrics.
+    Evaluates representation quality by training probes of different complexity.
 
     Parameters:
-    - X_train, X_test: Feature sets for training and testing
-    - y_train, y_test: Corresponding labels
-    - verbose: If True, prints dataset details and results
+        representations (ndarray): Feature representations.
+        labels (ndarray): Labels for probing.
+        train_ratio (float): Ratio of train to test data.
 
     Returns:
-    - Dictionary containing regression performance metrics
+        dict: Performance metrics and plot URL.
     """
-    if verbose:
-        print(f"Train size: {len(X_train)}, Test size: {len(X_test)}")
-        print(f"\nTrain label distribution:\n{pd.Series(y_train).value_counts()}")
-        print(f"\nTest label distribution:\n{pd.Series(y_test).value_counts()}")
+    # Ensure representations are at least 2D
+    representations = np.asarray(representations)
+    if representations.ndim == 1:
+        representations = representations.reshape(-1, 1)
 
-    clf = make_pipeline(StandardScaler(), Ridge(solver="lsqr", max_iter=250000))
-    clf.fit(X_train, y_train)
-
-    y_pred = clf.predict(X_test)
-
-    metrics = {
-        "R²": r2_score(y_test, y_pred),
-        "MSE": mean_squared_error(y_test, y_pred),
-        "MAE": mean_absolute_error(y_test, y_pred),
-        "Median Absolute Error": median_absolute_error(y_test, y_pred),
-        "Explained Variance": explained_variance_score(y_test, y_pred),
-        "Max Error": max_error(y_test, y_pred),
-        "MAPE": mean_absolute_percentage_error(y_test, y_pred),
-    }
-
-    if verbose:
-        print("Linear Regression Metrics:", metrics)
-
-    return metrics
-
-
-def run_probing(representations, labels, folds=4, train_ratio=0.6, verbose=False):
-    """
-    Evaluate representations using logistic regression (classification) or Ridge regression (regression).
-    Uses k-fold cross-validation to compute mean performance metrics.
-
-    Parameters:
-    - representations: (N, D) array of latent features
-    - labels: (N,) array of labels (categorical or continuous)
-    - folds: Number of cross-validation folds
-    - train_ratio: Proportion of data used for training
-    - verbose: If True, prints detailed training information
-
-    Returns:
-    - scores: Mean performance metrics across folds
-    - errors: Standard deviation (uncertainty) of performance metrics
-    """
+    # Filter out NaNs
     mask = ~np.isnan(labels)
-    labels, representations = labels[mask], representations[mask]
 
-    is_categorical = len(np.unique(labels)) <= 2  # Classification if <= 2 unique labels
-
-    fold_results = []
-    for _ in range(folds):
-        indices = np.arange(len(labels))
-        np.random.shuffle(indices)
-        train_size = int(len(labels) * train_ratio)
-        train_idx, test_idx = indices[:train_size], indices[train_size:]
-
-        X_train, X_test = representations[train_idx], representations[test_idx]
-        y_train, y_test = labels[train_idx], labels[test_idx]
-
-        metrics = fit_logistic(X_train, X_test, y_train, y_test, verbose) if is_categorical else fit_linear(X_train, X_test, y_train, y_test, verbose)
-        fold_results.append(metrics)
-
-    # Compute mean and variance of metrics across folds
-    scores = {metric: np.mean([fold[metric] for fold in fold_results]) for metric in fold_results[0]}
-    errors = {metric: 2 * np.std([fold[metric] for fold in fold_results]) for metric in fold_results[0]}
+    labels = labels.reshape(-1)  # Ensure it's 1D
+    representations = representations.reshape(labels.shape[0], -1)  # Flatten if needed
+    labels = labels[mask]
+    representations = representations[mask]
     
+    # Train/Test split
+    if representations.ndim > 2:
+        representations = representations.reshape(representations.shape[0], -1)    
+    X_train, X_test, y_train, y_test = train_test_split(representations, labels, train_size=train_ratio, random_state=42)
 
-    return scores, errors
+    # Convert to torch tensors
+    X_train_t = torch.tensor(X_train, dtype=torch.float32)
+    X_test_t = torch.tensor(X_test, dtype=torch.float32)
+    y_train_t = torch.tensor(y_train, dtype=torch.float32)
+    y_test_t = torch.tensor(y_test, dtype=torch.float32)
+
+    # Define models with increasing complexity
+    model_configs = {
+        "Linear Regression": Ridge(),
+        "1-layer MLP": MLP(X_train.shape[1], [32]),
+        "5-layer MLP": MLP(X_train.shape[1], [64, 32, 32, 16, 8]),
+        "10-layer MLP": MLP(X_train.shape[1], [128] + [64]*4 + [32]*4)
+    }
+
+    # Determine if classification (binary) or regression task
+    is_categorical = len(np.unique(labels)) <= 2
+
+    # Initialize performance tracking
+    metrics = {"Model Complexity": [], "AUROC": [], "Accuracy": [], "R²": []}
+
+    # Train models and collect metrics
+    for model_name, model in model_configs.items():
+        if isinstance(model, Ridge):  # Traditional Ridge regression
+            model.fit(X_train, y_train)
+            preds = model.predict(X_test)
+        else:  # MLP models
+            loss_fn = nn.BCEWithLogitsLoss() if is_categorical else nn.MSELoss()
+            preds = train_model(X_train_t, y_train_t, X_test_t, y_test_t, model, loss_fn)
+        
+            # Ensure preds is a NumPy array
+            if isinstance(preds, torch.Tensor):
+                preds = preds.detach().cpu().numpy().squeeze()
+
+        # Compute metrics
+        auroc = roc_auc_score(y_test, preds) if is_categorical else None
+        acc = accuracy_score(y_test, preds.round()) if is_categorical else None
+        r2 = r2_score(y_test, preds)
+
+        # Store metrics
+        metrics["Model Complexity"].append(model_name)
+        metrics["AUROC"].append(auroc)
+        metrics["Accuracy"].append(acc)
+        metrics["R²"].append(r2)
+
+    ### Generate Plot ###
+    plot_filename = "probing_complexity.png"
+    plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
+    
+    plt.figure(figsize=(8, 6))
+    sns.lineplot(x=metrics["Model Complexity"], y=metrics["AUROC"], marker="o", label="AUROC")
+    sns.lineplot(x=metrics["Model Complexity"], y=metrics["Accuracy"], marker="o", label="Accuracy")
+    sns.lineplot(x=metrics["Model Complexity"], y=metrics["R²"], marker="o", label="R² Score")
+    
+    plt.xlabel("Model Complexity")
+    plt.ylabel("Performance Metric")
+    plt.title("Probing Performance Across Model Complexities")
+    plt.legend()
+    plt.grid(True)
+    plt.xticks(rotation=30)
+    plt.savefig(plot_filepath)
+    plt.close()
+
+    return {"metrics": metrics, "plot_url": f"/{plot_filepath}"}

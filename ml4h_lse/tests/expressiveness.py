@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from ml4h_lse.tests.probing import fit_logistic, fit_linear
+from ml4h_lse.utils import fit_logistic, fit_linear
 
 def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percent_to_remove_list=[0, 5, 10, 20], verbose=False, plots=True):
     """
