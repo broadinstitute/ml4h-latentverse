@@ -127,5 +127,6 @@ def run_probing(representations, labels, folds=4, train_ratio=0.6, verbose=False
     # Compute mean and variance of metrics across folds
     scores = {metric: np.mean([fold[metric] for fold in fold_results]) for metric in fold_results[0]}
     errors = {metric: 2 * np.std([fold[metric] for fold in fold_results]) for metric in fold_results[0]}
+    
 
     return scores, errors
