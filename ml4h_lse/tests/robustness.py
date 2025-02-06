@@ -31,12 +31,15 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
 
         elif metric == "probing":
             results = run_probing(representations=noisy_representations, labels=labels)
-            results = results[0]
+            results = results["metrics"]
         # Store results in dictionary
         for key, value in results.items():
             if key not in noisy_scores:
                 noisy_scores[key] = []
-            noisy_scores[key].append(value)
+            if metric == "probing":
+                noisy_scores[key].append(value[0])
+            elif metric == "clustering":
+                noisy_scores[key].append(value)
 
     if plots:
         plt.figure(figsize=(8, 6))
