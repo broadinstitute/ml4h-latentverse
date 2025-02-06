@@ -52,10 +52,10 @@ def run_expressiveness(representations, phenotypes, folds=4, train_ratio=0.6, pe
                         X_test = np.delete(X_test, list(dims_to_remove), axis=1)
 
                     if is_categorical:
-                        metrics = fit_logistic(phenotype, X_train, X_test, y_train, y_test, verbose)
+                        metrics = fit_logistic(X_train, X_test, y_train, y_test, verbose)
                         metric_scores[percent_to_remove].append(metrics['AUROC'])
                     else:
-                        metrics = fit_linear(phenotype, X_train, X_test, y_train, y_test, verbose)
+                        metrics = fit_linear(X_train, X_test, y_train, y_test, verbose)
                         metric_scores[percent_to_remove].append(metrics['R²'])
 
             mean_scores = {percent: np.mean(scores) for percent, scores in metric_scores.items()}
