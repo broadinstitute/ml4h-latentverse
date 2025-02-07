@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from ml4h_lse.tests.probing import run_probing
 from ml4h_lse.tests.clustering import run_clustering
+import os
 
 PLOTS_DIR = "static/plots"
 os.makedirs(PLOTS_DIR, exist_ok=True)

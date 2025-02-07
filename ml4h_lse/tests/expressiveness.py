@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 from ml4h_lse.utils import fit_logistic, fit_linear
 
 PLOTS_DIR = "static/plots"
