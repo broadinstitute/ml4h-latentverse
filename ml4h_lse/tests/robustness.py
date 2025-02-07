@@ -25,7 +25,7 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
         # Apply Gaussian noise
         noisy_representations = representations + noise_level * np.random.normal(size=representations.shape)
 
-        results = None
+        results = {}
         
         if metric == "clustering":
             results = run_clustering(representations=noisy_representations, labels=labels)
@@ -35,8 +35,6 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
             results = run_probing(representations=noisy_representations, labels=labels)
             results = results["metrics"]
             
-        if results is None:
-            raise ValueError(f"Invalid metric: {metric}. Expected 'clustering' or 'probing'.")
         # Store results in dictionary
         for key, value in results.items():
             if key not in noisy_scores:
