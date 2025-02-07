@@ -1,10 +1,78 @@
 import numpy as np
-from sklearn.linear_model import LogisticRegression, Lasso
+from sklearn.linear_model import LinearRegression, Lasso
+from sklearn.metrics import balanced_accuracy_score
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import roc_auc_score
 from scipy.stats import entropy
 from ml4h_lse.utils import fit_logistic, fit_linear
+from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
+
+
+def compute_sap_score(representations, labels, is_continuous):
+    """
+    Compute the Separated Attribute Predictability (SAP) score.
+    
+    :param representations: (N, d) array of inferred latents
+    :param labels: (N,) array of ground-truth factors
+    :param is_continuous: booleans indicating if each factor is continuous (regression) or categorical (classification)
+    :return: SAP score
+    """
+    d = representations.shape[1]  # Number of latent dimensions   
+    S = np.zeros((d, ))  # Score matrix
+    for i in range(d):
+        X = representations[:, i].reshape(-1, 1)
+        
+        if is_continuous:  # Regression task
+            model = LinearRegression()
+            model.fit(X, labels)
+            y_pred = model.predict(X)
+            covariance = np.cov(labels, y_pred, bias=True)[0, 1]
+            std_y_true = np.std(labels, ddof=0)
+            std_y_pred = np.std(y_pred, ddof=0)
+            S[i] = (covariance / (std_y_true * std_y_pred)) ** 2
+        else:  # Classification task
+            le = LabelEncoder()
+            labels_encoded = le.fit_transform(labels)
+            unique_classes = len(np.unique(labels_encoded))
+            thresholds = np.linspace(np.min(X), np.max(X), unique_classes)
+            best_balanced_accuracy = 0
+            for threshold in thresholds:
+                y_pred = np.digitize(X.flatten(), bins=thresholds) - 1
+                balanced_acc = balanced_accuracy_score(labels_encoded, y_pred)
+                best_balanced_accuracy = max(best_balanced_accuracy, balanced_acc)
+            S[i] = best_balanced_accuracy
+    
+    # Compute SAP score by averaging the best latent factor for each generative factor
+    sap_score = np.max(S, axis=0)
+    return sap_score
+
+
+def compute_mig(representations, labels, is_continuous):
+    """
+    Compute the Mutual Information Gap (MIG).
+    
+    :param representations: (N, d) array of inferred latents
+    :param labels: (N,) array of ground-truth factors
+    :param is_continuous: List of booleans indicating if each factor is continuous (regression) or categorical (classification)
+    :return: MIG score
+    """
+    d = representations.shape[1]  # Number of latent dimensions
+    
+    I_matrix = np.zeros((d, 1))  # Mutual information matrix
+    
+    for i in range(d):
+        X = representations[:, i].reshape(-1, 1)
+        if is_continuous:  # Regression task
+            I_matrix[i] = mutual_info_regression(X, labels.reshape(-1, 1)).item()
+        else:  # Classification task
+            I_matrix[i] = mutual_info_classif(X, labels)
+    H = np.std(labels)  # Approximate entropy with std
+    sorted_I = np.sort(I_matrix)[::-1]  # Sort mutual information values
+    mig_value = (sorted_I[0] - sorted_I[1]) / H
+    return mig_value[0]
+
 
 def estimate_intrinsic_dimension(embeddings, k=5):
     """
@@ -23,6 +91,7 @@ def estimate_intrinsic_dimension(embeddings, k=5):
 
     log_ratios = np.log(distances[:, -1]) - np.log(distances[:, 0])
     return (k - 1) / np.mean(log_ratios)
+
 
 def run_disentanglement(representations, labels):
     """
@@ -88,37 +157,10 @@ def run_disentanglement(representations, labels):
     }
 
     # **SAP: Separated Attribute Predictability**
-    sap_scores = []
-    for dim in range(embeddings.shape[1]):
-        model = LogisticRegression() if is_categorical else Lasso(alpha=0.01)
-        model.fit(embeddings[:, dim].reshape(-1, 1), labels)
-        
-        if is_categorical:
-            sap_scores.append(roc_auc_score(labels, model.predict_proba(embeddings[:, dim].reshape(-1, 1))[:, 1]))
-        else:
-            sap_scores.append(model.coef_[0])
-
-    sap_gap = np.max(sap_scores) - np.partition(sap_scores, -2)[-2]
-    results["SAP"] = sap_gap
+    results["SAP"] = compute_sap_score(embeddings, labels, is_continuous=len(np.unique(labels))>2)
 
     # **MIG: Mutual Information Gap (Categorical labels only)**
-    if len(np.unique(labels)) <= 10:  # Apply MIG if labels are discrete
-        mutual_info = []
-        for dim in range(embeddings.shape[1]):
-            hist_2d, _, _ = np.histogram2d(embeddings[:, dim], labels, bins=10)
-            joint_prob = hist_2d / np.sum(hist_2d)
-            joint_prob += 1e-8  # Avoid division by zero
-            marginals_z = np.sum(joint_prob, axis=0) + 1e-8
-            marginals_v = np.sum(joint_prob, axis=1) + 1e-8
-
-            denominator = marginals_v[:, None] * marginals_z[None, :]
-            denominator[denominator == 0] = 1e-8
-            
-            mi = np.nansum(joint_prob * np.log(joint_prob / denominator))
-            mutual_info.append(mi)
-
-        mig = (np.max(mutual_info) - np.partition(mutual_info, -2)[-2]) / entropy(labels)
-        results["MIG"] = mig
+    results["MIG"] = compute_mig(embeddings, labels, is_continuous=len(np.unique(labels))>2)
 
     # **Total Correlation (TC) using Gaussian Mixture Models**
     gmm = GaussianMixture(n_components=1, covariance_type='full', random_state=42)
