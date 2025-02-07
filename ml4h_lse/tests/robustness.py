@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from ml4h_lse.tests.probing import run_probing
 from ml4h_lse.tests.clustering import run_clustering
 
@@ -17,6 +18,31 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
     Returns:
     - noisy_scores: Dictionary mapping metric names to lists of scores for different noise levels
     """
+    # Convert to NumPy arrays if they are Pandas DataFrames
+    if isinstance(representations, pd.DataFrame):
+        representations = representations.to_numpy()
+    if isinstance(labels, pd.DataFrame):
+        labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
+
+    # Ensure labels are 1D
+    labels = np.asarray(labels).reshape(-1)
+
+    # Ensure representations are at least 2D
+    representations = np.asarray(representations)
+    if representations.ndim == 1:
+        representations = representations.reshape(-1, 1)
+
+    # Ensure labels and representations have the same number of rows
+    if labels.shape[0] != representations.shape[0]:
+        min_samples = min(labels.shape[0], representations.shape[0])
+        labels = labels[:min_samples]
+        representations = representations[:min_samples, :]
+
+    # Apply mask AFTER ensuring the same shape
+    mask = ~np.isnan(labels)
+    labels = labels[mask]
+    representations = representations[mask, :]
+
     noisy_scores = {}  # Initialize dictionary to store results
 
     plt.figure(figsize=(8, 6))
