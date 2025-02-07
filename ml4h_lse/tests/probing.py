@@ -110,8 +110,8 @@ def run_probing(representations, labels, train_ratio=0.6):
     # Convert to torch tensors
     X_train_t = torch.tensor(X_train, dtype=torch.float32)
     X_test_t = torch.tensor(X_test, dtype=torch.float32)
-    y_train_t = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)  # Ensure 2D
-    y_test_t = torch.tensor(y_test, dtype=torch.float32).unsqueeze(1)  # Ensure 2D
+    y_train_t = torch.tensor(y_train, dtype=torch.float32)
+    y_test_t = torch.tensor(y_test, dtype=torch.float32)
 
     # Define models with increasing complexity
     input_dim = X_train.shape[1]
