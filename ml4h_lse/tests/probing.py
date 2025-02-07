@@ -79,6 +79,12 @@ def run_probing(representations, labels, train_ratio=0.6):
     Returns:
         dict: Performance metrics and plot URL.
     """
+    # Convert Pandas DataFrame to NumPy array
+    if isinstance(representations, pd.DataFrame):
+        representations = representations.to_numpy()
+    if isinstance(labels, pd.DataFrame):
+        labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
+
     # Ensure representations are at least 2D
     representations = np.asarray(representations)
     if representations.ndim == 1:
@@ -86,11 +92,8 @@ def run_probing(representations, labels, train_ratio=0.6):
 
     # Filter out NaNs
     mask = ~np.isnan(labels)
+    labels, representations = labels[mask], representations[mask, :]
 
-    labels = labels.reshape(-1)  # Ensure it's 1D
-    representations = representations.reshape(labels.shape[0], -1)  # Flatten if needed
-    labels = labels[mask]
-    representations = representations[mask]
     
     # Train/Test split
     if representations.ndim > 2:
