@@ -90,9 +90,17 @@ def run_probing(representations, labels, train_ratio=0.6):
     if representations.ndim == 1:
         representations = representations.reshape(-1, 1)
 
-    # Filter out NaNs
     mask = ~np.isnan(labels)
-    labels, representations = labels[mask], representations[mask, :]
+
+    # Ensure labels and representations have the same number of rows
+    if labels.shape[0] != representations.shape[0]:
+        min_samples = min(labels.shape[0], representations.shape[0])
+        labels = labels[:min_samples]
+        representations = representations[:min_samples]
+
+    # Apply mask AFTER ensuring same shape
+    labels = labels[mask]
+    representations = representations[mask]
 
     
     # Train/Test split
