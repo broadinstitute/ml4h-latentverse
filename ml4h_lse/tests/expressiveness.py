@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import os
 from ml4h_lse.utils import fit_logistic, fit_linear
 
@@ -25,9 +26,34 @@ def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percen
     """
     results = {}
 
-    # Remove NaN values from labels
+    # Convert to NumPy arrays if they are Pandas DataFrames
+    if isinstance(representations, pd.DataFrame):
+        representations = representations.to_numpy()
+    if isinstance(labels, pd.DataFrame):
+        labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
+
+    # Ensure labels are 1D
+    labels = np.asarray(labels).reshape(-1)
+
+    # Ensure representations are at least 2D
+    representations = np.asarray(representations)
+    if representations.ndim == 1:
+        representations = representations.reshape(-1, 1)
+
+    # Ensure labels and representations have the same number of rows
+    if labels.shape[0] != representations.shape[0]:
+        min_samples = min(labels.shape[0], representations.shape[0])
+        labels = labels[:min_samples]
+        representations = representations[:min_samples, :]
+
+    # Apply mask AFTER ensuring the same shape
     mask = ~np.isnan(labels)
-    labels, representations = labels[mask], representations[mask]
+    labels = labels[mask]
+    representations = representations[mask, :]
+    
+    representations = np.nan_to_num(representations)
+    
+    results = {}
 
     # Determine if the task is classification or regression
     is_categorical = len(np.unique(labels)) <= 2
