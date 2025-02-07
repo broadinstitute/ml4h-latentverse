@@ -74,6 +74,7 @@ def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percen
     results = {percent: np.mean(scores) for percent, scores in metric_scores.items()}
 
     # Plot performance drop as correlated dimensions are removed
+    plot_url = None
     if plots:
         plt.figure(figsize=(8, 6))
         plt.plot(percent_to_remove_list, [results[percent] for percent in percent_to_remove_list], marker='o')
@@ -90,6 +91,6 @@ def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percen
         plt.close()
 
         plot_url = f"/static/plots/{plot_filename}"
-    return {"metrics": noisy_scores, "plot_url": plot_url}
+    return {"metrics": results, "plot_url": plot_url}
 
 
