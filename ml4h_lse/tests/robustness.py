@@ -4,6 +4,9 @@ import pandas as pd
 from ml4h_lse.tests.probing import run_probing
 from ml4h_lse.tests.clustering import run_clustering
 
+PLOTS_DIR = "static/plots"
+os.makedirs(PLOTS_DIR, exist_ok=True)
+
 def run_robustness(representations, labels, noise_levels, metric="clustering", plots=True):
     """
     Evaluates robustness of learned representations by adding noise and measuring clustering or probing performance.
@@ -69,7 +72,8 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
                 noisy_scores[key].append(value[0])
             elif metric == "clustering":
                 noisy_scores[key].append(value)
-
+    
+    plot_url = None
     if plots:
         plt.figure(figsize=(8, 6))
         for key, values in noisy_scores.items():
@@ -81,6 +85,12 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
         plt.title(f"Robustness of Representations ({metric.capitalize()})", fontsize=16)
         plt.legend()
         plt.grid()
-        plt.show()
+        plot_filename = f"robustness_{metric}.png"
+        plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
+        plt.savefig(plot_filepath)
+        plt.close()
 
-    return noisy_scores
+        plot_url = f"/static/plots/{plot_filename}"
+
+    return {"metrics": noisy_scores, "plot_url": plot_url}
+
