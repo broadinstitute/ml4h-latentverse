@@ -72,29 +72,39 @@ def run_probing(representations, labels, train_ratio=0.6):
     Evaluates representation quality by training probes of different complexity.
 
     Parameters:
-        representations (ndarray): Feature representations.
-        labels (ndarray): Labels for probing.
+        representations (ndarray or DataFrame): Feature representations.
+        labels (ndarray or DataFrame): Labels for probing.
         train_ratio (float): Ratio of train to test data.
 
     Returns:
         dict: Performance metrics and plot URL.
     """
+    # Convert Pandas DataFrame to NumPy array
+    if isinstance(representations, pd.DataFrame):
+        representations = representations.to_numpy()
+    if isinstance(labels, pd.DataFrame):
+        labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
+
     # Ensure representations are at least 2D
     representations = np.asarray(representations)
     if representations.ndim == 1:
         representations = representations.reshape(-1, 1)
 
-    # Filter out NaNs
-    mask = ~np.isnan(labels)
+    # Ensure labels is a 1D array
+    labels = np.asarray(labels).reshape(-1)
 
-    labels = labels.reshape(-1)  # Ensure it's 1D
-    representations = representations.reshape(labels.shape[0], -1)  # Flatten if needed
+    # Ensure labels and representations have the same number of rows
+    if labels.shape[0] != representations.shape[0]:
+        min_samples = min(labels.shape[0], representations.shape[0])
+        labels = labels[:min_samples]
+        representations = representations[:min_samples, :]
+
+    # Apply mask AFTER ensuring same shape
+    mask = ~np.isnan(labels)
     labels = labels[mask]
-    representations = representations[mask]
-    
+    representations = representations[mask, :]
+
     # Train/Test split
-    if representations.ndim > 2:
-        representations = representations.reshape(representations.shape[0], -1)    
     X_train, X_test, y_train, y_test = train_test_split(representations, labels, train_size=train_ratio, random_state=42)
 
     # Convert to torch tensors
@@ -104,11 +114,12 @@ def run_probing(representations, labels, train_ratio=0.6):
     y_test_t = torch.tensor(y_test, dtype=torch.float32)
 
     # Define models with increasing complexity
+    input_dim = X_train.shape[1]
     model_configs = {
         "Linear Regression": Ridge(),
-        "1-layer MLP": MLP(X_train.shape[1], [32]),
-        "5-layer MLP": MLP(X_train.shape[1], [64, 32, 32, 16, 8]),
-        "10-layer MLP": MLP(X_train.shape[1], [128] + [64]*4 + [32]*4)
+        "1-layer MLP": MLP(input_dim, [32]),
+        "5-layer MLP": MLP(input_dim, [64, 32, 32, 16, 8]),
+        "10-layer MLP": MLP(input_dim, [128] + [64] * 4 + [32] * 4)
     }
 
     # Determine if classification (binary) or regression task
@@ -159,4 +170,4 @@ def run_probing(representations, labels, train_ratio=0.6):
     plt.savefig(plot_filepath)
     plt.close()
 
-    return {"metrics": metrics, "plot_url": f"/{plot_filepath}"}
+    return {"metrics": {}, "plot_url": f"/{plot_filepath}"}

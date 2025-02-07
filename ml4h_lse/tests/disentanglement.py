@@ -106,9 +106,20 @@ def run_disentanglement(representations, labels):
     """
     results = {}
 
-    # Remove NaN entries
+    # Ensure labels and representations are NumPy arrays
+    labels = np.asarray(labels).reshape(-1)  # Ensure labels are 1D
+    representations = np.asarray(representations)
+
+    # Ensure labels and representations have the same number of rows
+    if labels.shape[0] != representations.shape[0]:
+        min_samples = min(labels.shape[0], representations.shape[0])
+        labels = labels[:min_samples]
+        representations = representations[:min_samples, :]
+
+    # Apply mask AFTER ensuring same shape
     mask = ~np.isnan(labels)
-    labels, representations = labels[mask], representations[mask]
+    labels = labels[mask]
+    representations = representations[mask, :]
     
     is_categorical = len(np.unique(labels)) <= 2  # Determine if labels are categorical
 
