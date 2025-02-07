@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from ml4h_lse.utils import fit_logistic, fit_linear
 
+PLOTS_DIR = "static/plots"
+os.makedirs(PLOTS_DIR, exist_ok=True)
+
 def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percent_to_remove_list=[0, 5, 10, 20], verbose=False, plots=True):
     """
     Evaluates the expressiveness of learned representations by measuring performance (AUC or R²) 
@@ -73,10 +76,19 @@ def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percen
     if plots:
         plt.figure(figsize=(8, 6))
         plt.plot(percent_to_remove_list, [results[percent] for percent in percent_to_remove_list], marker='o')
+
         plt.xlabel("Percentage of Dimensions Removed", fontsize=14)
         plt.ylabel("Metric Score (AUC or R²)", fontsize=14)
         plt.title("Expressiveness Test Across Phenotypes", fontsize=16)
-        plt.grid()
-        plt.show()
+        plt.grid(True)
 
-    return results
+        # Save the plot
+        plot_filename = "expressiveness.png"
+        plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
+        plt.savefig(plot_filepath)
+        plt.close()
+
+        plot_url = f"/static/plots/{plot_filename}"
+    return {"metrics": noisy_scores, "plot_url": plot_url}
+
+
