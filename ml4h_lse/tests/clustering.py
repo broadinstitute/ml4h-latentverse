@@ -35,6 +35,7 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     # Compute evaluation metrics
     silhouette = silhouette_score(representations, cluster_labels)
     davies_bouldin = davies_bouldin_score(representations, cluster_labels)
+    labels = labels.astype(int)
     nmi = normalized_mutual_info_score(labels, cluster_labels) if labels is not None else None
 
     # Compute cluster learnability using 1-NN classifier
