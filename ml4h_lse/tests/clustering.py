@@ -25,17 +25,17 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     Returns:
         dict: Clustering evaluation metrics.
     """
-    # Convert Pandas DataFrame to NumPy
+    # Convert Pandas DataFrame to NumPy if necessary
     if isinstance(representations, pd.DataFrame):
         representations = representations.to_numpy()
     if isinstance(labels, pd.DataFrame):
         labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
 
-    # Remove NaN values and ensure same shape
-    if labels is not None:
+    # Ensure labels exist and have correct shape
+    has_labels = labels is not None and len(labels) > 0
+    if has_labels:
         mask = ~np.isnan(labels)
         labels, representations = labels[mask], representations[mask]
-
         labels = labels.astype(int)
 
         num_clusters = len(np.unique(labels))
@@ -44,12 +44,12 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
     cluster_labels = kmeans.fit_predict(representations)
 
+    # Compute NMI only if labels exist and match cluster labels in length
     nmi = None
-    if labels is not None and labels.shape[0] == cluster_labels.shape[0]:
+    if has_labels and labels.shape[0] == cluster_labels.shape[0]:
         nmi = normalized_mutual_info_score(labels, cluster_labels)
-
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-    cluster_labels = kmeans.fit_predict(representations).astype(int)
+    else:
+        print("Warning: Skipping NMI because of missing or mismatched labels")
 
     # Compute evaluation metrics
     silhouette = silhouette_score(representations, cluster_labels)
