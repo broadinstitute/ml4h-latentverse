@@ -4,6 +4,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set()
+import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, normalized_mutual_info_score, davies_bouldin_score
 from sklearn.neighbors import KNeighborsClassifier
