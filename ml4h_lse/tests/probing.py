@@ -59,7 +59,6 @@ def run_probing(representations, labels, train_ratio=0.6):
     is_categorical = len(np.unique(labels)) <= 2
 
     # Define models with increasing complexity
-    input_dim = X_train.shape[1]
     model_configs = {
         "Linear Regression": Ridge(),
         "1-layer MLP": MLPClassifier(hidden_layer_sizes=(32), max_iter=500) if is_categorical else MLPRegressor(hidden_layer_sizes=(32), max_iter=500),
@@ -74,6 +73,9 @@ def run_probing(representations, labels, train_ratio=0.6):
     for model_name, model in model_configs.items():
         model.fit(X_train, y_train)
         preds = model.predict(X_test)
+        
+        labels = labels.astype(int)
+        y_test = y_test.astype(int)
 
         # Compute metrics
         if is_categorical:
