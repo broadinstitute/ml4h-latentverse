@@ -73,12 +73,12 @@ def run_probing(representations, labels, train_ratio=0.6):
     for model_name, model in model_configs.items():
         model.fit(X_train, y_train)
         preds = model.predict(X_test)
-        
-        labels = labels.astype(int)
-        y_test = y_test.astype(int)
 
         # Compute metrics
         if is_categorical:
+            labels = labels.astype(int)
+            y_test = y_test.astype(int)
+
             if hasattr(model, "predict_proba"):
                 auroc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
             else:
