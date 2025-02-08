@@ -57,6 +57,10 @@ def run_probing(representations, labels, train_ratio=0.6):
 
     # Determine if classification (binary) or regression task
     is_categorical = len(np.unique(labels)) <= 2
+    
+    if is_categorical:
+            y_train = y_train.astype(int)
+            y_test = y_test.astype(int) 
 
     # Define models with increasing complexity
     model_configs = {
@@ -76,9 +80,6 @@ def run_probing(representations, labels, train_ratio=0.6):
 
         # Compute metrics
         if is_categorical:
-            labels = labels.astype(int)
-            y_test = y_test.astype(int)
-
             if hasattr(model, "predict_proba"):
                 auroc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
             else:
