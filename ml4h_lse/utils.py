@@ -14,6 +14,8 @@ from sklearn.metrics import (
 def load_data(representation_path, phenotype_labels, phenotype_path):
     latent_data = pd.read_csv(representation_path, sep='\t')
     phenotype_data = pd.read_csv(phenotype_path)
+    print("Latent Data BEFORE sample_id Type:", latent_data["sample_id"].dtype)
+    print("Phenotype Data BEFORE fpath Type:", phenotype_data["fpath"].dtype)
     
     # Standardize column names (strip spaces, lowercase)
     latent_data.columns = latent_data.columns.str.strip().str.lower()
@@ -22,6 +24,11 @@ def load_data(representation_path, phenotype_labels, phenotype_path):
     # Ensure sample_id and fpath are strings for merging
     latent_data["sample_id"] = latent_data["sample_id"].astype(int).astype(str)
     phenotype_data["fpath"] = phenotype_data["fpath"].astype(str)
+    print(latent_data.head())
+    
+    print("Latent Data AFTER sample_id Type:", latent_data["sample_id"].dtype)
+    print("Phenotype Data AFTER fpath Type:", phenotype_data["fpath"].dtype)
+    
 
     merged_data = pd.merge(latent_data, phenotype_data, left_on='sample_id', right_on='fpath', how='inner')
     merged_data = merged_data.dropna(subset=phenotype_labels).reset_index(drop=True)
