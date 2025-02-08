@@ -25,6 +25,9 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
         dict: Clustering evaluation metrics.
     """
     if labels is not None:
+        if isinstance(labels, pd.DataFrame) or isinstance(labels, pd.Series):
+            labels = labels.to_numpy().reshape(-1)
+        
         mask = ~np.isnan(labels)
         labels, representations = labels[mask], representations[mask]
         num_clusters = len(np.unique(labels))
@@ -54,12 +57,12 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     # Optional visualization
     plot_url = None
     if plots:
-        plot_url = visualize_clusterings(representations, cluster_labels, num_clusters, labels)
+        plot_url = visualize_clusterings(representations, cluster_labels, num_clusters)
 
     return {"results": results, "plot_url": plot_url}
 
 
-def visualize_clusterings(representations, cluster_labels, num_clusters, labels):
+def visualize_clusterings(representations, cluster_labels, num_clusters):
     """
     Visualizes KMeans clustering results, coloring points based on their cluster and labels.
 
@@ -67,34 +70,30 @@ def visualize_clusterings(representations, cluster_labels, num_clusters, labels)
         representations (ndarray): Feature representations.
         cluster_labels (ndarray): Cluster assignments.
         num_clusters (int): Number of clusters.
-        labels (ndarray): Ground truth labels for color mapping.
 
     """
     matplotlib.use('Agg')
 
-    markers = ['o', 's', '^', 'P', '*', 'X', 'D', 'v', '<', '>', 'h', 'H', '+', 'x', 'd', '|', '_', '8', '1', '2']
-    if num_clusters > len(markers):
-        raise ValueError(f"Number of clusters ({num_clusters}) exceeds available markers ({len(markers)}).")
-
     plt.figure(figsize=(8, 6))
+    
     # Compute first two principal components (PCA)
     pca = PCA(n_components=2)
     pca_rep = pca.fit_transform(representations)
 
     # Define color palette based on number of clusters
-    colors = sns.color_palette('tab10', n_colors=num_clusters)
+    colors = sns.color_palette('husl', n_colors=num_clusters)
 
     # Plot each cluster with its unique color
     for cluster_idx in range(num_clusters):
         cluster_mask = cluster_labels == cluster_idx
 
-        sns.scatterplot(
+        plt.scatter(
             x=pca_rep[cluster_mask, 0],
             y=pca_rep[cluster_mask, 1],
             color=colors[cluster_idx],
             marker='o',
             label=f'Cluster {cluster_idx}',
-            alpha=0.7
+            alpha=0.4
         )
 
     plt.title("Clustering Visualization", fontsize=16)
