@@ -28,6 +28,8 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     if labels is not None:
         if isinstance(labels, pd.DataFrame) or isinstance(labels, pd.Series):
             labels = labels.to_numpy().reshape(-1)
+        # Ensure labels are 1D
+        labels = np.asarray(labels).reshape(-1)
         
         mask = ~np.isnan(labels)
         labels, representations = labels[mask], representations[mask]
