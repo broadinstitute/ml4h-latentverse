@@ -79,25 +79,21 @@ def visualize_clusterings(representations, cluster_labels, num_clusters, labels)
     pca = PCA(n_components=2)
     pca_rep = pca.fit_transform(representations)
 
-    # Define color palette for groups
-    unique_labels = np.unique(labels)
-    colors = sns.color_palette('tab10', n_colors=len(unique_labels))
+    # Define color palette based on number of clusters
+    colors = sns.color_palette('tab10', n_colors=num_clusters)
 
+    # Plot each cluster with its unique color
     for cluster_idx in range(num_clusters):
         cluster_mask = cluster_labels == cluster_idx
 
-        for label_idx, label_value in enumerate(unique_labels):
-            phenotype_mask = labels == label_value
-            combined_mask = cluster_mask & phenotype_mask
-
-            sns.scatterplot(
-                x=pca_rep[combined_mask, 0],
-                y=pca_rep[combined_mask, 1],
-                color=colors[label_idx],
-                marker=markers[cluster_idx],
-                label=f'Class {label_value} (Cluster {cluster_idx})',
-                alpha=0.7
-            )
+        sns.scatterplot(
+            x=pca_rep[cluster_mask, 0],
+            y=pca_rep[cluster_mask, 1],
+            color=colors[cluster_idx],
+            marker='o',
+            label=f'Cluster {cluster_idx}',
+            alpha=0.7
+        )
 
     plt.title("Clustering Visualization", fontsize=16)
     plt.xlabel("Principal Component 1")
