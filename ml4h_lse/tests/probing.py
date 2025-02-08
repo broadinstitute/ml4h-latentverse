@@ -82,9 +82,7 @@ def run_probing(representations, labels, train_ratio=0.6):
     for model_name, model in model_configs.items():
         model.fit(X_train, y_train)
         preds = model.predict(X_test).astype(int)
-        
-        print(f"Unique preds values for {model_name}:", np.unique(preds))
-
+    
         # Compute metrics
         if is_categorical:
             if hasattr(model, "predict_proba"):
