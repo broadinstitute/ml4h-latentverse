@@ -12,64 +12,16 @@ from sklearn.metrics import (
 )
 
 def load_data(representation_path, phenotype_labels, phenotype_path):
-    print("DEBUG: load_data() function called")
-    
-    import os
-    print(f"DEBUG: Checking if files exist -> {representation_path}: {os.path.exists(representation_path)}, {phenotype_path}: {os.path.exists(phenotype_path)}")
+    latent_data = pd.read_csv(representation_path, sep='\t')
+    phenotype_data = pd.read_csv(phenotype_path)
 
-    try:
-        latent_data = pd.read_csv(representation_path, delimiter="\t", engine="python", encoding="utf-8-sig")
-        phenotype_data = pd.read_csv(phenotype_path)
-        print("DEBUG: Files successfully loaded")
-    except Exception as e:
-        print(f"ERROR: Failed to load CSV files: {e}")
-        return None, None
-    
-    print("DEBUG: Latent Data Columns:", latent_data.columns)
-    print("DEBUG: Phenotype Data Columns:", phenotype_data.columns)
-
-    # Standardize column names (strip spaces, lowercase)
-    latent_data.columns = latent_data.columns.str.strip().str.lower()
-    phenotype_data.columns = phenotype_data.columns.str.strip().str.lower()
-
-    print("DEBUG: Latent Data Columns AFTER LOWERCASE:", latent_data.columns)
-    print("DEBUG: Phenotype Data Columns AFTER LOWERCASE:", phenotype_data.columns)
-
-    # Ensure sample_id and fpath exist
-    if 'sample_id' not in latent_data.columns:
-        print("ERROR: 'sample_id' column missing from Latent Data!")
-        return None, None
-    
-    if 'fpath' not in phenotype_data.columns:
-        print("ERROR: 'fpath' column missing from Phenotype Data!")
-        return None, None
-
-    # Ensure sample_id and fpath are strings for merging
-    latent_data["sample_id"] = latent_data["sample_id"].astype(int).astype(str)
-    phenotype_data["fpath"] = phenotype_data["fpath"].astype(str)
-
-    print("DEBUG: Latent Data Sample (first 5 rows):\n", latent_data.head())
-    print("DEBUG: Phenotype Data Sample (first 5 rows):\n", phenotype_data.head())
-
-    # Merge datasets
-    try:
-        merged_data = pd.merge(latent_data, phenotype_data, left_on='sample_id', right_on='fpath', how='inner')
-        print("DEBUG: Merging completed, merged data shape:", merged_data.shape)
-    except Exception as e:
-        print(f"ERROR: Merging failed: {e}")
-        return None, None
-
+    merged_data = pd.merge(latent_data, phenotype_data, left_on='sample_id', right_on='fpath', how='inner')
     merged_data = merged_data.dropna(subset=phenotype_labels).reset_index(drop=True)
-    print("DEBUG: Data after dropping NaNs:", merged_data.shape)
 
     representations = merged_data.filter(regex='^latent_').values
     phenotypes = merged_data[phenotype_labels]
 
-    print("DEBUG: Final Representations Shape:", representations.shape)
-    print("DEBUG: Final Phenotypes Shape:", phenotypes.shape)
-
     return representations, phenotypes
-
 
 def downsample_data(representations, phenotypes, max_samples=1000):
     if representations.shape[0] > max_samples:
