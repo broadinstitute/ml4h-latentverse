@@ -28,6 +28,8 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
         mask = ~np.isnan(labels)
         labels, representations = labels[mask], representations[mask]
         num_clusters = len(np.unique(labels))
+        labels = labels.astype(int)
+
 
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
     cluster_labels = kmeans.fit_predict(representations)
@@ -35,7 +37,6 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     # Compute evaluation metrics
     silhouette = silhouette_score(representations, cluster_labels)
     davies_bouldin = davies_bouldin_score(representations, cluster_labels)
-    labels = labels.astype(int)
     nmi = normalized_mutual_info_score(labels, cluster_labels) if labels is not None else None
 
     # Compute cluster learnability using 1-NN classifier
