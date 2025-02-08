@@ -12,8 +12,18 @@ from sklearn.metrics import (
 )
 
 def load_data(representation_path, phenotype_labels, phenotype_path):
-    latent_data = pd.read_csv(representation_path, sep='\t')
-    phenotype_data = pd.read_csv(phenotype_path)
+    print("DEBUG: load_data() function called")
+
+    import os
+    print(f"DEBUG: Checking if files exist -> {representation_path}: {os.path.exists(representation_path)}, {phenotype_path}: {os.path.exists(phenotype_path)}")
+
+    try:
+        latent_data = pd.read_csv(representation_path, sep='\t')
+        phenotype_data = pd.read_csv(phenotype_path)
+        print("DEBUG: Files successfully loaded")
+    except Exception as e:
+        print(f"ERROR: Failed to load CSV files: {e}")
+        return None, None
     print("Latent Data BEFORE sample_id Type:", latent_data["sample_id"].dtype)
     print("Phenotype Data BEFORE fpath Type:", phenotype_data["fpath"].dtype)
     
