@@ -18,7 +18,7 @@ def load_data(representation_path, phenotype_labels, phenotype_path):
     print(f"DEBUG: Checking if files exist -> {representation_path}: {os.path.exists(representation_path)}, {phenotype_path}: {os.path.exists(phenotype_path)}")
 
     try:
-        latent_data = pd.read_csv(representation_path, sep='\t')
+        latent_data = pd.read_csv(representation_path, sep="\t", encoding="utf-8-sig", engine="python")
         phenotype_data = pd.read_csv(phenotype_path)
         print("DEBUG: Files successfully loaded")
     except Exception as e:
