@@ -27,10 +27,10 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     """
     if isinstance(representations, pd.DataFrame):
         representations = representations.to_numpy()
-    if isinstance(labels, pd.DataFrame):
-        labels = labels.to_numpy().reshape(-1)
         
     if labels is not None:
+        if isinstance(labels, pd.DataFrame):
+            labels = labels.to_numpy().reshape(-1)
         mask = ~np.isnan(labels)
         labels, representations = labels[mask], representations[mask]
 
