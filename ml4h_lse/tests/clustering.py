@@ -25,25 +25,31 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     Returns:
         dict: Clustering evaluation metrics.
     """
-    if labels is not None:
-        if isinstance(labels, pd.DataFrame) or isinstance(labels, pd.Series):
-            labels = labels.to_numpy().reshape(-1)
-        # Ensure labels are 1D
-        labels = np.asarray(labels).reshape(-1)
+    if isinstance(representations, pd.DataFrame):
+        representations = representations.to_numpy()
+    if isinstance(labels, pd.DataFrame):
+        labels = labels.to_numpy().reshape(-1)
         
+    if labels is not None:
         mask = ~np.isnan(labels)
         labels, representations = labels[mask], representations[mask]
-        num_clusters = len(np.unique(labels))
+
         labels = labels.astype(int)
 
+        num_clusters = len(np.unique(labels))
 
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
     cluster_labels = kmeans.fit_predict(representations)
 
+    if labels.shape[0] == cluster_labels.shape[0]:
+        nmi = normalized_mutual_info_score(labels, cluster_labels)
+    else:
+        print(f"Shape mismatch: labels {labels.shape}, clusters {cluster_labels.shape}")
+        nmi = None
+
     # Compute evaluation metrics
     silhouette = silhouette_score(representations, cluster_labels)
     davies_bouldin = davies_bouldin_score(representations, cluster_labels)
-    nmi = normalized_mutual_info_score(labels, cluster_labels) if labels is not None else None
 
     # Compute cluster learnability using 1-NN classifier
     knn = KNeighborsClassifier(n_neighbors=1, metric='euclidean')
