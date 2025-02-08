@@ -50,17 +50,16 @@ def run_probing(representations, labels, train_ratio=0.6):
     labels = labels[mask]
     representations = representations[mask, :]
 
-    # Train/Test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        representations, labels, train_size=train_ratio, random_state=42
-    )
-
     # Determine if classification (binary) or regression task
     is_categorical = len(np.unique(labels)) <= 2
     
     if is_categorical:
-            y_train = y_train.astype(int)
-            y_test = y_test.astype(int) 
+            labels = labels.astype(int)
+
+    # Train/Test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        representations, labels, train_size=train_ratio, random_state=42
+    )
 
     # Define models with increasing complexity
     model_configs = {
@@ -72,11 +71,19 @@ def run_probing(representations, labels, train_ratio=0.6):
 
     # Initialize performance tracking
     metrics = {"Model Complexity": [], "AUROC": [], "Accuracy": [], "R²": []}
+    
+    if is_categorical:
+        y_train = y_train.astype(int)
+        y_test = y_test.astype(int)
+    print("Unique y_train values:", np.unique(y_train))
+    print("Unique y_test values:", np.unique(y_test))
 
     # Train models and collect metrics
     for model_name, model in model_configs.items():
         model.fit(X_train, y_train)
-        preds = model.predict(X_test)
+        preds = model.predict(X_test).astype(int)
+        
+        print(f"Unique preds values for {model_name}:", np.unique(preds))
 
         # Compute metrics
         if is_categorical:
