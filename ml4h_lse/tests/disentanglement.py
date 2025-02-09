@@ -8,6 +8,7 @@ from scipy.stats import entropy
 from ml4h_lse.utils import fit_logistic, fit_linear
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
+from scipy.stats import entropy
 
 
 def compute_sap_score(representations, labels, is_continuous):
@@ -68,8 +69,15 @@ def compute_mig(representations, labels, is_continuous):
             I_matrix[i] = mutual_info_regression(X, labels.reshape(-1, 1)).item()
         else:  # Classification task
             I_matrix[i] = mutual_info_classif(X, labels)
-    H = np.std(labels)  # Approximate entropy with std
-    sorted_I = np.sort(I_matrix)[::-1]  # Sort mutual information values
+    if is_continuous:
+        hist, bin_edges = np.histogram(labels, bins=30, density=True)
+        hist = hist[hist > 0]  # Avoid log(0)
+        H = -np.sum(hist * np.log(hist)) * (bin_edges[1] - bin_edges[0])
+    else:
+        values, counts = np.unique(labels, return_counts=True)
+        probabilities = counts / len(labels)
+        H = entropy(probabilities)
+    sorted_I = np.sort(I_matrix)[::-1]
     mig_value = (sorted_I[0] - sorted_I[1]) / H
     return mig_value[0]
 

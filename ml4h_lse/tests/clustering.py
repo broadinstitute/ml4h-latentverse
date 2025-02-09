@@ -38,8 +38,8 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     nmi = normalized_mutual_info_score(labels, cluster_labels) if labels is not None else None
 
     # Compute cluster learnability using 1-NN classifier
-    knn = KNeighborsClassifier(n_neighbors=1, metric='euclidean')
-    knn.fit(kmeans.cluster_centers_, np.arange(num_clusters))
+    knn = KNeighborsClassifier(n_neighbors=5, metric='euclidean')
+    knn.fit(representations, cluster_labels)
     cl_score = np.mean(knn.predict(representations) == cluster_labels)
 
     results = {
