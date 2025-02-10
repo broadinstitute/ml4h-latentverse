@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 import os
 
 
-def run_clustering(representations, labels, num_clusters=None, plots=False):
+def run_clustering(representations, labels=None, num_clusters=None, plots=False):
     """
     Performs KMeans clustering, evaluates clustering quality, and optionally visualizes results.
 
