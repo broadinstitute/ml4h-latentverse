@@ -70,18 +70,24 @@ def run_robustness(representations_list, labels, noise_levels, metric="clusterin
                 results = run_probing(representations=noisy_representations, labels=labels)
                 results = results["metrics"]
 
-            # Store results in dictionary
+            # Store results in dictionary, ensuring values are floats
             for key, value in results.items():
                 if key not in noisy_scores[rep_name]:
                     noisy_scores[rep_name][key] = []
-                noisy_scores[rep_name][key].append(value[0] if metric == "probing" else value)
+                if isinstance(value, (int, float, np.number)):  # Ensure value is numeric
+                    noisy_scores[rep_name][key].append(float(value))
+                else:
+                    print(f"Skipping {key} due to non-numeric value: {value}")  # Debugging
 
     plot_url = None
     if plots:
         plt.figure(figsize=(8, 6))
         for rep_name in representation_names:
             for key, values in noisy_scores[rep_name].items():
-                plt.plot(noise_levels, values, label=f"{rep_name} - {key}")
+                if all(isinstance(v, (int, float, np.number)) for v in values):  # Ensure all values are numeric
+                    plt.plot(noise_levels, values, label=f"{rep_name} - {key}")
+                else:
+                    print(f"Skipping {key} due to non-numeric values: {values}")  # Debugging
 
         plt.xlabel("Noise Level", fontsize=14)
         plt.ylabel("Performance Score", fontsize=14)
@@ -97,4 +103,3 @@ def run_robustness(representations_list, labels, noise_levels, metric="clusterin
         plot_url = f"/static/plots/{plot_filename}"
 
     return {"metrics": noisy_scores, "plot_url": plot_url}
-
