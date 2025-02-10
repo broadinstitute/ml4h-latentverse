@@ -102,7 +102,7 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
     pca_rep = pca.fit_transform(representations)
 
     # Define color palette based on number of clusters
-    colors = sns.color_palette('husl')#, n_colors=num_clusters)
+    colors = sns.color_palette('husl', n_colors=10)
 
     # Plot each cluster with its unique color
     # for cluster_idx in range(num_clusters):
@@ -112,7 +112,7 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
     plt.scatter(
         x=pca_rep[:, 0],
         y=pca_rep[:, 1],
-        # color=colors[cluster_labels] if labels is None else colors[labels],
+        color=colors[cluster_labels] if labels is None else colors[labels],
         # marker=markers[cluster_labels],
         label=f'Cluster',
         alpha=0.4
