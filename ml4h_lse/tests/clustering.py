@@ -32,6 +32,7 @@ def run_clustering(representations, labels, num_clusters=None, plots=False):
         labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
 
     # Ensure labels exist and have correct shape
+    labels = np.asarray(labels) 
     has_labels = labels is not None and len(labels) > 0
     if has_labels:
         mask = ~np.isnan(labels)
