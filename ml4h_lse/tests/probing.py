@@ -123,4 +123,4 @@ def run_probing(representations, labels, train_ratio=0.6):
     plt.savefig(plot_filepath)
     plt.close()
 
-    return {"metrics": {}, "plot_url": f"/{plot_filepath}"}
+    return {"metrics": metrics, "plot_url": f"/{plot_filepath}"}
