@@ -113,7 +113,7 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
         x=pca_rep[:, 0],
         y=pca_rep[:, 1],
         # color=colors[cluster_labels] if labels is None else colors[labels],
-        marker=markers[cluster_labels],
+        # marker=markers[cluster_labels],
         label=f'Cluster',
         alpha=0.4
     )
