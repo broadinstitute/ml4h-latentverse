@@ -111,21 +111,20 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
     print(labels, "labels")
     print(cluster_labels, "cluster_labels")
     hue = [colors[l] for l in cluster_labels] if labels is None else [colors[l] for l in labels]
-    plt.scatter(
+    sns.scatterplot(
         x=pca_rep[:, 0],
         y=pca_rep[:, 1],
-        color=hue,
-        # marker=marker_list,
-        label=cluster_labels,
+        hue=hue,
+        markers=markers,
+        # label=f'Cluster {}',
         alpha=0.4
     )
-
 
     plt.title("Clustering Visualization", fontsize=16)
     plt.xlabel("Principal Component 1")
     plt.ylabel("Principal Component 2")
     plt.grid(True)
-    plt.legend(title="Legend", loc='best', bbox_to_anchor=(1.05, 1))
+    plt.legend(labels=["Female", "Male"], title="Legend", loc='best', bbox_to_anchor=(1.05, 1))
     plt.tight_layout()
     plot_filename = f"clustering_plot.png"
     plot_filepath = os.path.join("static/plots", plot_filename)
