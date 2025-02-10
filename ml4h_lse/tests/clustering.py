@@ -95,7 +95,8 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
     matplotlib.use('Agg')
 
     plt.figure(figsize=(8, 6))
-    markers = ['o', '.', ',', 'x', '+', '*']
+    markers = ['o', '.', ',', 'x', '+', '*', 'v', '^', '<', '>', 's', 'p', 'h', 'H', 'D', 'd', '|', '_']
+
     
     # Compute first two principal components (PCA)
     pca = PCA(n_components=2)
@@ -111,14 +112,15 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
     print(cluster_labels, "cluster_labels")
     hue = [colors[l] for l in cluster_labels] if labels is None else [colors[l] for l in labels]
     marker_list = [markers[l] for l in cluster_labels]
-    plt.scatter(
-        x=pca_rep[:, 0],
-        y=pca_rep[:, 1],
-        color=hue,
-        marker=marker_list,
-        label=f'Cluster',
-        alpha=0.4
-    )
+    for cluster in cluster_labels:
+        plt.scatter(
+            x=pca_rep[cluster_labels == cluster, 0],
+            y=pca_rep[cluster_labels == cluster, 1],
+            color=hue[cluster_labels == cluster],
+            marker=marker_list[cluster_labels],
+            label=f'Cluster',
+            alpha=0.4
+        )
 
 
     plt.title("Clustering Visualization", fontsize=16)
