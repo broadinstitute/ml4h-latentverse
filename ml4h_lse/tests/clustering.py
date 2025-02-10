@@ -109,11 +109,13 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
     #     cluster_mask = cluster_labels == cluster_idx
     print(labels, "labels")
     print(cluster_labels, "cluster_labels")
+    hue = [colors[l] for l in cluster_labels] if labels is None else [colors[l] for l in labels]
+    marker_list = [markers[l] for l in cluster_labels]
     plt.scatter(
         x=pca_rep[:, 0],
         y=pca_rep[:, 1],
-        color=colors[cluster_labels] if labels is None else colors[labels],
-        # marker=markers[cluster_labels],
+        color=hue,
+        marker=marker_list,
         label=f'Cluster',
         alpha=0.4
     )
