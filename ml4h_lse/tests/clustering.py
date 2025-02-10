@@ -70,12 +70,12 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
     # Optional visualization
     plot_url = None
     if plots:
-        plot_url = visualize_clusterings(representations, cluster_labels, num_clusters)
+        plot_url = visualize_clusterings(representations, cluster_labels, labels, num_clusters)
 
     return {"results": results, "plot_url": plot_url}
 
 
-def visualize_clusterings(representations, cluster_labels, num_clusters):
+def visualize_clusterings(representations, cluster_labels, labels=None, num_clusters=None):
     """
     Visualizes KMeans clustering results, coloring points based on their cluster and labels.
 
@@ -88,26 +88,27 @@ def visualize_clusterings(representations, cluster_labels, num_clusters):
     matplotlib.use('Agg')
 
     plt.figure(figsize=(8, 6))
+    markers = ['x', 'o', '+']
     
     # Compute first two principal components (PCA)
     pca = PCA(n_components=2)
     pca_rep = pca.fit_transform(representations)
 
     # Define color palette based on number of clusters
-    colors = sns.color_palette('husl', n_colors=num_clusters)
+    colors = sns.color_palette('husl')#, n_colors=num_clusters)
 
     # Plot each cluster with its unique color
-    for cluster_idx in range(num_clusters):
-        cluster_mask = cluster_labels == cluster_idx
+    # for cluster_idx in range(num_clusters):
+    #     cluster_mask = cluster_labels == cluster_idx
 
-        plt.scatter(
-            x=pca_rep[cluster_mask, 0],
-            y=pca_rep[cluster_mask, 1],
-            color=colors[cluster_idx],
-            marker='o',
-            label=f'Cluster {cluster_idx}',
-            alpha=0.4
-        )
+    plt.scatter(
+        x=pca_rep[cluster_mask, 0],
+        y=pca_rep[cluster_mask, 1],
+        color=colors[labels] if labels is not None else colors[cluster_labels],
+        marker=markers[cluster_labels],
+        label=f'Cluster {cluster_idx}',
+        alpha=0.4
+    )
 
     plt.title("Clustering Visualization", fontsize=16)
     plt.xlabel("Principal Component 1")
