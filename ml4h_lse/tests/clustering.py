@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 import os
 
 
-def run_clustering(representations, num_clusters=None, labels=None, plots=False):
+def run_clustering(representations, labels, num_clusters=None, plots=False):
     """
     Performs KMeans clustering, evaluates clustering quality, and optionally visualizes results.
 
@@ -100,7 +100,7 @@ def visualize_clusterings(representations, cluster_labels, num_clusters):
     for cluster_idx in range(num_clusters):
         cluster_mask = cluster_labels == cluster_idx
 
-        plt.scatter(
+        sns.scatterplot(
             x=pca_rep[cluster_mask, 0],
             y=pca_rep[cluster_mask, 1],
             color=colors[cluster_idx],
