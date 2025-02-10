@@ -10,32 +10,18 @@ os.makedirs(PLOTS_DIR, exist_ok=True)
 
 def run_robustness(representations, labels, noise_levels, metric="clustering", plots=True):
     """
-    Evaluates robustness of multiple learned representations by adding noise and measuring clustering or probing performance.
-
-    Parameters:
-    - representations: (N, D) matrix of latent representations
-    - labels: (N,) array of target labels.
-    - noise_levels: List of noise magnitudes to apply.
-    - metric: "clustering" (Silhouette Score) or "probing" (Predictive Performance).
-    - plots: If True, generates a performance plot.
-    - representation_names: List of names corresponding to each representation matrix.
-
-    Returns:
-    - noisy_scores: Dictionary mapping metric names to lists of scores for different noise levels.
+    Evaluates robustness of learned representations by adding noise and measuring clustering or probing performance.
     """
-
     # Convert labels to NumPy array if needed
     if isinstance(labels, pd.DataFrame):
-        labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
+        labels = labels.to_numpy().reshape(-1)
     labels = np.asarray(labels).reshape(-1)
 
     # Apply mask AFTER ensuring the same shape
     mask = ~np.isnan(labels)
     labels = labels[mask]
 
-    noisy_scores = {}  # Store scores for each representation
-
-    # Convert to NumPy arrays if needed
+    # Convert representations to NumPy
     if isinstance(representations, pd.DataFrame):
         representations = representations.to_numpy()
     representations = np.asarray(representations)
@@ -45,7 +31,9 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
     labels = labels[:min_samples]
     representations = representations[:min_samples, :]
 
-    representations = representations[mask, :]  # Apply mask to remove NaNs
+    representations = representations[mask, :]  # Apply same mask
+
+    noisy_scores = {}
 
     for noise_level in noise_levels:
         # Apply Gaussian noise
@@ -54,22 +42,35 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
         results = {}
         if metric == "clustering":
             results = run_clustering(representations=noisy_representations, labels=labels)
-            results = results['results']
+            results = results.get("results", {})
         elif metric == "probing":
             results = run_probing(representations=noisy_representations, labels=labels)
-            results = results["metrics"]
+            results = results.get("metrics", {})
 
-        # Store results in dictionary
+        # Debugging: Check if results are empty
+        print(f"Noise Level: {noise_level}, Results: {results}")
+
+        # Store results
         for key, value in results.items():
+            print(f"Key: {key}, Value: {value}")  # Debugging
             if key not in noisy_scores:
                 noisy_scores[key] = []
-            noisy_scores[key].append(value[0] if metric == "probing" else value)
+
+            if isinstance(value, (list, np.ndarray)) and len(value) > 0:
+                noisy_scores[key].append(value[0])  # Only take first element if it's a list
+            else:
+                noisy_scores[key].append(float(value) if isinstance(value, (int, float, np.number)) else value)
+
+    print("Final Noisy Scores:", noisy_scores)  # Debugging before plotting
 
     plot_url = None
     if plots:
         plt.figure(figsize=(8, 6))
         for key, values in noisy_scores.items():
-            plt.plot(noise_levels, values, label=f"{key}")
+            if all(isinstance(v, (int, float, np.number)) for v in values):
+                plt.plot(noise_levels, values, label=f"{key}")
+            else:
+                print(f"Skipping {key} due to non-numeric values: {values}")  # Debugging
 
         plt.xlabel("Noise Level", fontsize=14)
         plt.ylabel("Performance Score", fontsize=14)
@@ -85,4 +86,3 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
         plot_url = f"/static/plots/{plot_filename}"
 
     return {"metrics": noisy_scores, "plot_url": plot_url}
-
