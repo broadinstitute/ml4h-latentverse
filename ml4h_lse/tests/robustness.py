@@ -8,93 +8,109 @@ import os
 PLOTS_DIR = "static/plots"
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
-def run_robustness(representations_list, labels, noise_levels, metric="clustering", plots=True, representation_names=None):
+def extract_numeric(val):
     """
-    Evaluates robustness of multiple learned representations by adding noise and measuring clustering or probing performance.
+    Recursively extract a numeric value from a nested value.
+    If extraction fails, returns np.nan.
+    """
+    if isinstance(val, (list, np.ndarray)):
+        if len(val) == 0:
+            return np.nan
+        return extract_numeric(val[0])
+    try:
+        return float(val)
+    except Exception:
+        return np.nan
 
+def run_robustness(representations, labels, noise_levels, metric="clustering", plots=True):
+    """
+    Evaluates robustness of a learned representation by adding noise and measuring 
+    clustering or probing performance.
+    
     Parameters:
-    - representations_list: List of (N, D) arrays, each containing a set of feature embeddings.
-    - labels: (N,) array of target labels.
-    - noise_levels: List of noise magnitudes to apply.
-    - metric: "clustering" (Silhouette Score) or "probing" (Predictive Performance).
-    - plots: If True, generates a performance plot.
-    - representation_names: List of names corresponding to each representation matrix.
-
+      - representations: (N, D) matrix (or DataFrame) of latent representations.
+      - labels: (N,) array (or DataFrame) of target labels.
+      - noise_levels: List of noise magnitudes to apply.
+      - metric: "clustering" or "probing".
+      - plots: If True, generate a performance plot.
+    
     Returns:
-    - noisy_scores: Dictionary mapping metric names to lists of scores for different noise levels.
+      - A dictionary with "metrics" (mapping each metric name to a list of scores across noise levels)
+        and "plot_url" (path to the saved plot, if any).
     """
-    if not isinstance(representations_list, list):
-        representations_list = [representations_list]  # Convert single representation to a list
-
-    # Assign default names if not provided
-    if representation_names is None:
-        representation_names = [f"Representation {i+1}" for i in range(len(representations_list))]
-
-    # Convert labels to NumPy array if needed
+    # Convert labels to a NumPy array (1D)
     if isinstance(labels, pd.DataFrame):
-        labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
+        labels = labels.to_numpy().reshape(-1)
     labels = np.asarray(labels).reshape(-1)
-
-    # Apply mask AFTER ensuring the same shape
+    
+    # Apply mask to remove NaNs in labels
     mask = ~np.isnan(labels)
     labels = labels[mask]
-
-    noisy_scores = {name: {} for name in representation_names}  # Store scores for each representation
-
-    for rep_idx, representations in enumerate(representations_list):
-        rep_name = representation_names[rep_idx]
-
-        # Convert to NumPy arrays if needed
-        if isinstance(representations, pd.DataFrame):
-            representations = representations.to_numpy()
-        representations = np.asarray(representations)
-
-        # Ensure labels and representations have the same number of rows
-        min_samples = min(labels.shape[0], representations.shape[0])
-        labels = labels[:min_samples]
-        representations = representations[:min_samples, :]
-
-        representations = representations[mask, :]  # Apply mask to remove NaNs
-
-        noisy_scores[rep_name] = {}  # Initialize dictionary for this representation
-
-        for noise_level in noise_levels:
-            # Apply Gaussian noise
-            noisy_representations = representations + noise_level * np.random.normal(size=representations.shape)
-
-            results = {}
+    
+    # Convert representations to a NumPy array
+    if isinstance(representations, pd.DataFrame):
+        representations = representations.to_numpy()
+    representations = np.asarray(representations)
+    
+    # Truncate to the same number of samples and apply the same mask to representations
+    min_samples = min(len(labels), representations.shape[0])
+    labels = labels[:min_samples]
+    representations = representations[:min_samples, :]
+    representations = representations[mask, :]
+    
+    noisy_scores = {}  # This dictionary will hold our metric values across noise levels
+    
+    # Loop over each noise level
+    for noise_level in noise_levels:
+        # Add Gaussian noise
+        noisy_representations = representations + noise_level * np.random.normal(size=representations.shape)
+        results = {}
+        try:
             if metric == "clustering":
-                results = run_clustering(representations=noisy_representations, labels=labels)
-                results = results['results']
+                res = run_clustering(representations=noisy_representations, labels=labels)
+                results = res.get("results", {})
             elif metric == "probing":
-                results = run_probing(representations=noisy_representations, labels=labels)
-                results = results["metrics"]
-
-            # Store results in dictionary
-            for key, value in results.items():
-                if key not in noisy_scores[rep_name]:
-                    noisy_scores[rep_name][key] = []
-                noisy_scores[rep_name][key].append(value[0] if metric == "probing" else value)
-
+                res = run_probing(representations=noisy_representations, labels=labels)
+                results = res.get("metrics", {})
+            else:
+                results = {}
+        except Exception as e:
+            print(f"Error at noise level {noise_level}: {e}")
+            results = {}
+        print(f"Noise Level: {noise_level}, Results: {results}")  # Debug output
+        
+        # For each metric key in results, extract a numeric value and store it.
+        for key, value in results.items():
+            if key not in noisy_scores:
+                noisy_scores[key] = []
+            numeric_val = extract_numeric(value)
+            noisy_scores[key].append(numeric_val)
+    
+    print("Final Noisy Scores:", noisy_scores)  # Debug output
+    
     plot_url = None
     if plots:
         plt.figure(figsize=(8, 6))
-        for rep_name in representation_names:
-            for key, values in noisy_scores[rep_name].items():
-                plt.plot(noise_levels, values, label=f"{rep_name} - {key}")
-
+        for key, values in noisy_scores.items():
+            print(f"Plotting {key}: {values}")  # Debug output
+            # Only plot if all values are numeric (finite)
+            if values and all(np.isfinite(v) for v in values):
+                plt.plot(noise_levels, values, marker="o", label=key)
+            else:
+                print(f"Skipping {key} due to non-numeric values: {values}")
         plt.xlabel("Noise Level", fontsize=14)
         plt.ylabel("Performance Score", fontsize=14)
         plt.title(f"Representation Robustness ({metric.capitalize()})", fontsize=16)
         plt.legend()
         plt.grid()
-
         plot_filename = f"robustness_{metric}.png"
         plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
-        plt.savefig(plot_filepath)
+        plt.savefig(plot_filepath, format="png", dpi=300)
         plt.close()
-
-        plot_url = f"/static/plots/{plot_filename}"
-
+        if os.path.exists(plot_filepath):
+            print(f"✅ Plot saved successfully at {plot_filepath}")
+            plot_url = f"/static/plots/{plot_filename}"
+        else:
+            print("⚠️ Plot was NOT saved correctly!")
+    
     return {"metrics": noisy_scores, "plot_url": plot_url}
-

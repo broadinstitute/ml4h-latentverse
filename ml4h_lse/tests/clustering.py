@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 import os
 
 
-def run_clustering(representations, num_clusters=None, labels=None, plots=False):
+def run_clustering(representations, labels, num_clusters=None, plots=False):
     """
     Performs KMeans clustering, evaluates clustering quality, and optionally visualizes results.
 
@@ -32,13 +32,20 @@ def run_clustering(representations, num_clusters=None, labels=None, plots=False)
         labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
 
     # Ensure labels exist and have correct shape
+    labels = np.asarray(labels) 
     has_labels = labels is not None and len(labels) > 0
+    
+     # Determine number of clusters
+    if num_clusters is None:
+        if has_labels:
+            num_clusters = len(np.unique(labels))  # Use labels if no num_clusters is given
+        else:
+            raise ValueError("num_clusters must be provided if labels are missing.")
+
     if has_labels:
         mask = ~np.isnan(labels)
         labels, representations = labels[mask], representations[mask]
         labels = labels.astype(int)
-
-        num_clusters = len(np.unique(labels))
 
     # Run KMeans clustering
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
@@ -109,6 +116,7 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
         label=f'Cluster {cluster_idx}',
         alpha=0.4
     )
+
 
     plt.title("Clustering Visualization", fontsize=16)
     plt.xlabel("Principal Component 1")
