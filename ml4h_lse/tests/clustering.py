@@ -95,7 +95,7 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
     matplotlib.use('Agg')
 
     plt.figure(figsize=(8, 6))
-    markers = ["o", "s", "^", "P", "X", "D", "v", "<", ">"]
+    markers = ['o', '.', ',', 'x', '+', '*']
     
     # Compute first two principal components (PCA)
     pca = PCA(n_components=2)
