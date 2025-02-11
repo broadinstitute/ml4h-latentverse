@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+sns.set()
 import os
 from sklearn.linear_model import Ridge
 from sklearn.metrics import accuracy_score, roc_auc_score, r2_score
