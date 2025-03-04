@@ -48,7 +48,7 @@ def run_disentanglement(representations, labels):
         if is_continuous:
             I_matrix[i] = mutual_info_regression(X, labels.reshape(-1, 1)).item()
         else:
-            I_matrix[i] = mutual_info_classif(X, labels)
+            I_matrix[i] = mutual_info_classif(X, labels.reshape(-1, 1)).item()
 
     # DCI Probability Normalization
     # importance_matrix = np.zeros((embeddings.shape[1],))
@@ -114,19 +114,20 @@ def compute_mig(I_matrix, labels, is_continuous):
     """
     Compute the Mutual Information Gap (MIG).
     """
-    sorted_I = np.sort(I_matrix)[::-1]  # Sort mutual information values
+    # sorted_I = np.sort(I_matrix)[::-1]  # Sort mutual information values
+    # I_matrix = sorted_I + H_z
+    sorted_I = np.sort(I_matrix)[::-1]
 
     # Compute entropy correctly
     unique, counts = np.unique(labels, return_counts=True)
     prob_dist = counts / counts.sum()
     H = entropy(prob_dist)  # Shannon entropy
-
+    
     if H > 0 and len(sorted_I) > 1:
         mig_value = (sorted_I[0] - sorted_I[1]) / H
     else:
         mig_value = 0  # If entropy is 0 or there's only one latent
-
-    return min(max(mig_value, 0), 1)[0] 
+    return min(max(mig_value, 0), 1)
     
 
 def compute_disentanglement_score(I_matrix):
