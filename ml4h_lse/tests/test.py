@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from ml4h_lse.tests.clustering import run_clustering
 from ml4h_lse.tests.disentanglement import run_disentanglement
+from ml4h_lse.tests.expressiveness import run_expressiveness
 
 ########### DATA GENERATION ###########
 # idea: if var1 & var2 are small, cluster should be good/tight; 
@@ -76,6 +77,30 @@ def generate_disentanglement_data(n_samples=500, mode="fully_disentangled"):
 
     return data, label_regress
 
+def generate_expressiveness_data(n_samples=500, n_features=10, mode="high"):
+    """
+    Generates synthetic data for expressiveness testing.
+    - 'high': Label depends on all features.
+    - 'low': Label depends on only one feature.
+    """
+    torch.manual_seed(42)
+
+    representations = torch.randn(n_samples, n_features)
+
+    if mode == "high":
+        # labels depend on all features (linear combination)
+        weights = torch.randn(n_features)
+        labels = representations @ weights + torch.randn(n_samples) * 0.1
+
+    elif mode == "low":
+        # weights = torch.zeros(n_features)
+        # weights[0] = 5
+        # labels = representations @ weights + torch.randn(n_samples) * 0.1
+        labels = torch.randn(n_samples)
+
+
+    return representations.numpy(), labels.numpy().reshape(-1, 1)
+
 
 # modes = ["fully_disentangled", "partially_disentangled", "fully_entangled"]
 # fig, axes = plt.subplots(1, 3, figsize=(18, 5))
@@ -119,8 +144,6 @@ def test_clusterability():
 
     print("\nClusterability metrics are behaving as expected!")
 
-test_clusterability()
-
 def test_disentanglement():
     print("Running disentanglement ...\n")
 
@@ -151,6 +174,23 @@ def test_disentanglement():
 
     # print("\nDisentanglement metrics are behaving as expected!")
 
-test_disentanglement()
+def test_expressiveness():
+    print("\n=== Running Expressiveness Tests ===")
+    
+    data_high, labels_high = generate_expressiveness_data(mode="high")
+    data_low, labels_low = generate_expressiveness_data(mode="low") 
+    
+    for dataset, labels, name in [
+        (data_high, labels_high, "High Expressiveness"),
+        (data_low, labels_low, "Low Expressiveness"),
+    ]:
+        results = run_expressiveness(dataset, labels, percent_to_remove_list = [0, 10, 20, 50, 100], plots=False)
+        print(f"Results for {name}: {results['metrics']}\n")
+
+
+#### RUN TESTS ####
+# test_clusterability()    
+# test_disentanglement()
+test_expressiveness()
 
 

@@ -70,8 +70,11 @@ def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percen
         is_categorical = len(np.unique(y)) <= 2  # Check if binary classification
 
         for percent_to_remove in percent_to_remove_list:
-            num_dims_to_remove = int((percent_to_remove / 100) * X.shape[1])
-            dims_to_remove = {correlation_pairs[i][1] for i in range(num_dims_to_remove)} if percent_to_remove > 0 else set()
+            num_dims_to_remove = max(1, int((percent_to_remove / 100) * X.shape[1]))
+    
+            feature_label_corr = np.abs(np.corrcoef(X.T, y.squeeze())[:-1, -1])
+            feature_importance = np.argsort(feature_label_corr)[::-1]
+            dims_to_remove = set(feature_importance[:num_dims_to_remove])
 
             for _ in range(folds):
                 # Shuffle and split dataset into train-test
