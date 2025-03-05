@@ -5,7 +5,7 @@ from ml4h_lse.tests.probing import run_probing
 from ml4h_lse.tests.clustering import run_clustering
 import os
 
-PLOTS_DIR = "static/plots"
+PLOTS_DIR = "stratic/plots"
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 def extract_numeric(val):
@@ -77,7 +77,6 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
         except Exception as e:
             print(f"Error at noise level {noise_level}: {e}")
             results = {}
-        print(f"Noise Level: {noise_level}, Results: {results}")  # Debug output
         
         # For each metric key in results, extract a numeric value and store it.
         for key, value in results.items():
@@ -85,14 +84,11 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
                 noisy_scores[key] = []
             numeric_val = extract_numeric(value)
             noisy_scores[key].append(numeric_val)
-    
-    print("Final Noisy Scores:", noisy_scores)  # Debug output
-    
+        
     plot_url = None
     if plots:
         plt.figure(figsize=(8, 6))
         for key, values in noisy_scores.items():
-            print(f"Plotting {key}: {values}")  # Debug output
             # Only plot if all values are numeric (finite)
             if values and all(np.isfinite(v) for v in values):
                 plt.plot(noise_levels, values, marker="o", label=key)
@@ -108,9 +104,6 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
         plt.savefig(plot_filepath, format="png", dpi=300)
         plt.close()
         if os.path.exists(plot_filepath):
-            print(f"✅ Plot saved successfully at {plot_filepath}")
             plot_url = f"/static/plots/{plot_filename}"
         else:
-            print("⚠️ Plot was NOT saved correctly!")
-    
-    return {"metrics": noisy_scores, "plot_url": plot_url}
+            return {"metrics": noisy_scores, "plot_url": plot_url}
