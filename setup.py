@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="ml4h_lse",
+    name="ml4h-latentverse",
     version="0.1.0",
     author="Yoanna Turura",
     author_email="yturura@broadinstitute.org",
     description="A library for evaluating self-supervised representations in ML",
-    packages=find_packages(include=["ml4h_lse", "ml4h_lse.tests"]),
+    packages=find_packages(include=["src", "src"]),
     install_requires=[
         "numpy",
         "matplotlib",

@@ -13,13 +13,13 @@ Latentverse is a library for evaluating the quality and reliability of latent re
 Latentverse is available on PyPI. You can install it using:
 
 ```bash
-pip install ml4h-lse
+pip install ml4h-latentverse
 ```
 
 Alternatively, if you are developing or modifying the package, clone the repository and install it in editable mode:
 ```bash
-git clone https://github.com/broadinstitute/ml4h-lse.git
-cd ml4h-lse
+git clone https://github.com/broadinstitute/ml4h-latentverse.git
+cd ml4h-latentverse
 pip install -e .
 ```
 
@@ -43,7 +43,7 @@ This test evaluates how well representations cluster given a specified number of
 
 Example usage below:
 ```bash
-from ml4h_lse.tests.clustering import run_clustering
+from ml4h_latentverse.tests.clustering import run_clustering
 
 representations = ...  # Load or generate your latent representations
 labels = ...  # Corresponding labels for evaluation
@@ -64,7 +64,7 @@ This test measures how well the latent dimensions capture independent factors of
 
 Example usage:
 ```bash
-from ml4h_lse.tests.disentanglement import run_disentanglement
+from ml4h_latentverse.tests.disentanglement import run_disentanglement
 
 data, labels = ...  # Load or generate latent representations and labels
 results = run_disentanglement(data, labels)
@@ -79,7 +79,7 @@ This test evaluates how much information the representations contain about label
 
 Example usage:
 ```bash
-from ml4h_lse.tests.expressiveness import run_expressiveness
+from ml4h_latentverse.tests.expressiveness import run_expressiveness
 
 data, labels = ...  # Load or generate data
 results = run_expressiveness(data, labels, percent_to_remove_list=[0, 10, 20, 50], plots=True)
@@ -101,7 +101,7 @@ This test examines how well representations withstand perturbations by introduci
 
 Example usage:
 ```bash
-from ml4h_lse.tests.robustness import run_robustness
+from ml4h_latentverse.tests.robustness import run_robustness
 
 data, labels = ...  # Load or generate data
 results = run_robustness(data, labels, noise_levels=[0.1, 0.5, 1.0, 1.5], metric="clustering", plots=True)
@@ -120,7 +120,7 @@ This test measures representation quality by training classifiers or regressors 
 
 Example usage:
 ```bash
-from ml4h_lse.tests.probing import run_probing
+from ml4h_latentverse.tests.probing import run_probing
 
 data, labels = ...  # Load or generate data
 results = run_probing(data, labels)
@@ -138,7 +138,7 @@ To validate the test suite, you can use the provided test cases:
 
 Example usage:
 ```bash
-from ml4h_lse.tests.test import test_clusterability, test_disentanglement, test_expressiveness, test_robustness
+from ml4h_latentverse.tests.test import test_clusterability, test_disentanglement, test_expressiveness, test_robustness
 
 test_clusterability()
 test_disentanglement()

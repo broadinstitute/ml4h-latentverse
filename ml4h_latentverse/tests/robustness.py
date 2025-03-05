@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from ml4h_lse.tests.probing import run_probing
-from ml4h_lse.tests.clustering import run_clustering
+from ml4h_latentverse.tests.probing import run_probing
+from ml4h_latentverse.tests.clustering import run_clustering
 import os
 
 PLOTS_DIR = "stratic/plots"

@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.linear_model import Lasso
 from sklearn.mixture import GaussianMixture
 from scipy.stats import entropy
-from ml4h_lse.utils import fit_logistic, fit_linear
+from ml4h_latentverse.utils import fit_logistic, fit_linear
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler

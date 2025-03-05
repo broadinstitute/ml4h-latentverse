@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-from ml4h_lse.utils import fit_logistic, fit_linear
+from ml4h_latentverse.utils import fit_logistic, fit_linear
 
 PLOTS_DIR = "static/plots"
 os.makedirs(PLOTS_DIR, exist_ok=True)

@@ -1,4 +1,4 @@
-from ml4h_lse.tests import (
+from ml4h_latentverse.tests import (
     run_clustering,
     run_disentanglement,
     run_expressiveness,
