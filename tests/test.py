@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from ml4h_lse.tests.clustering import run_clustering
 from ml4h_lse.tests.disentanglement import run_disentanglement
 from ml4h_lse.tests.expressiveness import run_expressiveness
+from ml4h_lse.tests.robustness import run_robustness
 
 ########### DATA GENERATION ###########
 # idea: if var1 & var2 are small, cluster should be good/tight; 
@@ -101,6 +102,23 @@ def generate_expressiveness_data(n_samples=500, n_features=10, mode="high"):
 
     return representations.numpy(), labels.numpy().reshape(-1, 1)
 
+def generate_robustness_data(n_samples=500, n_features=10, mode="sensitive"):
+    """
+    - 'sensitive': label is 1 if dim[0] is between 0.1 and 0.2.
+    - 'less_sensitive': label is 1 if dim[0] is between 0 and 1.
+    """
+    np.random.seed(42)
+
+    representations = np.random.randn(n_samples, n_features)
+
+    if mode == "sensitive":
+        labels = ((representations[:, 0] > 0.1) & (representations[:, 0] < 0.2)).astype(int)
+    else:
+        labels = ((representations[:, 0] > 0) & (representations[:, 0] < 1)).astype(int)
+
+    return representations, labels
+
+
 
 # modes = ["fully_disentangled", "partially_disentangled", "fully_entangled"]
 # fig, axes = plt.subplots(1, 3, figsize=(18, 5))
@@ -185,12 +203,41 @@ def test_expressiveness():
         (data_low, labels_low, "Low Expressiveness"),
     ]:
         results = run_expressiveness(dataset, labels, percent_to_remove_list = [0, 10, 20, 50, 100], plots=False)
-        print(f"Results for {name}: {results['metrics']}\n")
+        results_for_printing = {
+            phenotype: {percent: float(score) for percent, score in scores.items()}
+            for phenotype, scores in results["metrics"].items()
+        }
+
+        print(f"Results for {name}: {results_for_printing}\n")
+        
+        
+# expect: silhouette should decrease
+# dbi should increase
+# nmi should decrease (approach 0)
+# cl should decrease
+def test_robustness():
+    data_sensitive, labels_sensitive = generate_robustness_data(mode="sensitive")
+    data_less_sensitive, labels_less_sensitive = generate_robustness_data(mode="less_sensitive")
+    
+    print("\n=== Running Robustness Tests ===")
+    for dataset, labels, name in [
+        (data_sensitive, labels_sensitive, "Sensitive Data"),
+        (data_less_sensitive, labels_less_sensitive, "Less Sensitive Data"),
+    ]:
+        results = run_robustness(dataset, labels, noise_levels=[0.1, 0.5, 1.0, 1.5, 2.0], metric="clustering", plots=False)
+        results_for_printing = {
+            metric_name: [round(float(score), 4) for score in scores] 
+            for metric_name, scores in results["metrics"].items()
+        }
+
+
+        print(f"Results for {name}: {results_for_printing}\n")
 
 
 #### RUN TESTS ####
 # test_clusterability()    
 # test_disentanglement()
-test_expressiveness()
+# test_expressiveness()
+test_robustness()
 
 
