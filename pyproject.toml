@@ -1,3 +1,22 @@
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml4h-latentverse"
+version = "0.1.0"
+description = "Evaluation library for latent representations"
+authors = [{ name = "Yoanna Turura", email = "yturura@broadinstitute.org" }]
+dynamic = ["requires-python"]
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "torch",
+    "twine",
+    "wheel",
+    "build"
+]

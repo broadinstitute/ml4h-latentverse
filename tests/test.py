@@ -1,10 +1,10 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from ml4h_lse.tests.clustering import run_clustering
-from ml4h_lse.tests.disentanglement import run_disentanglement
-from ml4h_lse.tests.expressiveness import run_expressiveness
-from ml4h_lse.tests.robustness import run_robustness
+from ml4h_latentverse.tests.clustering import run_clustering
+from ml4h_latentverse.tests.disentanglement import run_disentanglement
+from ml4h_latentverse.tests.expressiveness import run_expressiveness
+from ml4h_latentverse.tests.robustness import run_robustness
 
 ########### DATA GENERATION ###########
 # idea: if var1 & var2 are small, cluster should be good/tight; 
