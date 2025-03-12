@@ -5,7 +5,7 @@ from ml4h_latentverse.tests.probing import run_probing
 from ml4h_latentverse.tests.clustering import run_clustering
 import os
 
-PLOTS_DIR = "stratic/plots"
+PLOTS_DIR = "static/plots"
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 def extract_numeric(val):
@@ -38,31 +38,25 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
       - A dictionary with "metrics" (mapping each metric name to a list of scores across noise levels)
         and "plot_url" (path to the saved plot, if any).
     """
-    # Convert labels to a NumPy array (1D)
     if isinstance(labels, pd.DataFrame):
         labels = labels.to_numpy().reshape(-1)
     labels = np.asarray(labels).reshape(-1)
     
-    # Apply mask to remove NaNs in labels
     mask = ~np.isnan(labels)
     labels = labels[mask]
     
-    # Convert representations to a NumPy array
     if isinstance(representations, pd.DataFrame):
         representations = representations.to_numpy()
     representations = np.asarray(representations)
     
-    # Truncate to the same number of samples and apply the same mask to representations
     min_samples = min(len(labels), representations.shape[0])
     labels = labels[:min_samples]
     representations = representations[:min_samples, :]
     representations = representations[mask, :]
     
-    noisy_scores = {}  # This dictionary will hold our metric values across noise levels
+    noisy_scores = {}
     
-    # Loop over each noise level
     for noise_level in noise_levels:
-        # Add Gaussian noise
         noisy_representations = representations + noise_level * np.random.normal(size=representations.shape)
         results = {}
         try:
@@ -78,18 +72,15 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
             print(f"Error at noise level {noise_level}: {e}")
             results = {}
         
-        # For each metric key in results, extract a numeric value and store it.
         for key, value in results.items():
             if key not in noisy_scores:
                 noisy_scores[key] = []
-            numeric_val = extract_numeric(value)
-            noisy_scores[key].append(numeric_val)
+            noisy_scores[key].append(extract_numeric(value))
         
     plot_url = None
     if plots:
         plt.figure(figsize=(8, 6))
         for key, values in noisy_scores.items():
-            # Only plot if all values are numeric (finite)
             if values and all(np.isfinite(v) for v in values):
                 plt.plot(noise_levels, values, marker="o", label=key)
             else:
@@ -105,5 +96,5 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
         plt.close()
         if os.path.exists(plot_filepath):
             plot_url = f"/static/plots/{plot_filename}"
-        else:
-            return {"metrics": noisy_scores, "plot_url": plot_url}
+    print(f"Debugging Robustness: {noisy_scores}")    
+    return {"metrics": noisy_scores, "plot_url": plot_url}

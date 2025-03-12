@@ -9,11 +9,9 @@ from sklearn.metrics import accuracy_score, roc_auc_score, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 
-# Create directory for plots if not exists
 PLOTS_DIR = "static/plots"
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
-### Run Probing Function ###
 def run_probing(representations, labels, train_ratio=0.6):
     """
     Evaluates representation quality by training probes of different complexity.
@@ -26,43 +24,35 @@ def run_probing(representations, labels, train_ratio=0.6):
     Returns:
         dict: Performance metrics and plot URL.
     """
-    # Convert Pandas DataFrame to NumPy array
     if isinstance(representations, pd.DataFrame):
         representations = representations.to_numpy()
     if isinstance(labels, pd.DataFrame):
-        labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
+        labels = labels.to_numpy().reshape(-1)
 
-    # Ensure representations are at least 2D
     representations = np.asarray(representations)
     if representations.ndim == 1:
         representations = representations.reshape(-1, 1)
 
-    # Ensure labels is a 1D array
     labels = np.asarray(labels).reshape(-1)
 
-    # Ensure labels and representations have the same number of rows
     if labels.shape[0] != representations.shape[0]:
         min_samples = min(labels.shape[0], representations.shape[0])
         labels = labels[:min_samples]
         representations = representations[:min_samples, :]
 
-    # Apply mask AFTER ensuring same shape
     mask = ~np.isnan(labels)
     labels = labels[mask]
     representations = representations[mask, :]
 
-    # Determine if classification (binary) or regression task
     is_categorical = len(np.unique(labels)) <= 2
     
     if is_categorical:
             labels = labels.astype(int)
 
-    # Train/Test split
     X_train, X_test, y_train, y_test = train_test_split(
         representations, labels, train_size=train_ratio, random_state=42
     )
 
-    # Define models with increasing complexity
     model_configs = {
         "Linear Regression": Ridge(),
         "1-layer MLP": MLPClassifier(hidden_layer_sizes=(32), max_iter=500) if is_categorical else MLPRegressor(hidden_layer_sizes=(32), max_iter=500),
@@ -70,7 +60,6 @@ def run_probing(representations, labels, train_ratio=0.6):
         "10-layer MLP": MLPClassifier(hidden_layer_sizes=(128, 64, 64, 64, 64, 32, 32, 32, 32), max_iter=500) if is_categorical else MLPRegressor(hidden_layer_sizes=(128, 64, 64, 64, 64, 32, 32, 32, 32), max_iter=500),
     }
 
-    # Initialize performance tracking
     metrics = {"Model Complexity": [], "AUROC": [], "Accuracy": [], "R²": []}
     
     if is_categorical:
@@ -79,12 +68,10 @@ def run_probing(representations, labels, train_ratio=0.6):
     print("Unique y_train values:", np.unique(y_train))
     print("Unique y_test values:", np.unique(y_test))
 
-    # Train models and collect metrics
     for model_name, model in model_configs.items():
         model.fit(X_train, y_train)
         preds = model.predict(X_test).astype(int)
     
-        # Compute metrics
         if is_categorical:
             if hasattr(model, "predict_proba"):
                 auroc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
@@ -97,13 +84,11 @@ def run_probing(representations, labels, train_ratio=0.6):
             acc = None
             r2 = r2_score(y_test, preds)
 
-        # Store metrics
         metrics["Model Complexity"].append(model_name)
         metrics["AUROC"].append(auroc)
         metrics["Accuracy"].append(acc)
         metrics["R²"].append(r2)
 
-    ### Generate Plot ###
     plot_filename = "probing_complexity.png"
     plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
 
@@ -124,4 +109,4 @@ def run_probing(representations, labels, train_ratio=0.6):
     plt.savefig(plot_filepath)
     plt.close()
 
-    return {"metrics": {}, "plot_url": f"/{plot_filepath}"}
+    return {"metrics": metrics, "plot_url": f"/{plot_filepath}"}
