@@ -76,7 +76,7 @@ def generate_disentanglement_data(n_samples=500, mode="fully_disentangled"):
         label_regress = data[:, 0] + data[:, 1]
         labels = torch.logical_and(data[:, 0] > 0, data[:, 1] > 0)
 
-    return data, label_regress
+    return data, labels
 
 def generate_expressiveness_data(n_samples=500, n_features=10, mode="high"):
     """
@@ -115,7 +115,8 @@ def generate_robustness_data(n_samples=500, n_features=10, mode="sensitive"):
         labels = ((representations[:, 0] > 0.1) & (representations[:, 0] < 0.2)).astype(int)
     else:
         labels = ((representations[:, 0] > 0) & (representations[:, 0] < 1)).astype(int)
-
+    print("representations: ", representations)
+    print("labels: ", labels)
     return representations, labels
 
 
@@ -202,7 +203,7 @@ def test_expressiveness():
         (data_high, labels_high, "High Expressiveness"),
         (data_low, labels_low, "Low Expressiveness"),
     ]:
-        results = run_expressiveness(dataset, labels, percent_to_remove_list = [0, 10, 20, 50, 100], plots=False)
+        results = run_expressiveness(dataset, labels, percent_to_remove_list = [10, 20, 30, 40, 50], plots=False)
         results_for_printing = {
             phenotype: {percent: float(score) for percent, score in scores.items()}
             for phenotype, scores in results["metrics"].items()
@@ -224,13 +225,11 @@ def test_robustness():
         (data_sensitive, labels_sensitive, "Sensitive Data"),
         (data_less_sensitive, labels_less_sensitive, "Less Sensitive Data"),
     ]:
-        results = run_robustness(dataset, labels, noise_levels=[0.1, 0.5, 1.0, 1.5, 2.0], metric="clustering", plots=False)
+        results = run_robustness(dataset, labels, noise_levels=[0.1, 0.2, 0.3, 0.4, 0.5], metric="probing", plots=False)
         results_for_printing = {
             metric_name: [round(float(score), 4) for score in scores] 
             for metric_name, scores in results["metrics"].items()
         }
-
-
         print(f"Results for {name}: {results_for_printing}\n")
 
 
@@ -239,5 +238,42 @@ def test_robustness():
 # test_disentanglement()
 # test_expressiveness()
 test_robustness()
+
+# expressiveness results
+# === Running Expressiveness Tests ===
+# Results for High Expressiveness:
+# {'Phenotype 1': {10: 0.68105049431324, 
+#                   20: 0.5305900871753693, 
+#                   30: 0.4015929251909256, 
+#                   40: 0.26407256722450256, 
+#                   50: 0.20073164999485016}}
+
+# Results for Low Expressiveness: 
+# {'Phenotype 1': {10: -0.0192401260137558, 
+#                   20: -0.055137306451797485, 
+#                   30: -0.04105457663536072,   
+#                   40: -0.04188293218612671,   
+#                   50: -0.03600379824638367}}
+
+
+# === Fully Disentangled ===
+# DCI Disentanglement: 0.8386
+# MIG Score: 0.0000
+# Total Correlation (TC): 0.0228
+# SAP Score: 0.9998
+# --------------------------------------------------
+
+# === Partially Disentangled ===
+# DCI Disentanglement: 0.4385
+# MIG Score: 0.0000
+# Total Correlation (TC): 0.0725
+# SAP Score: 0.9812
+# --------------------------------------------------
+
+# === Fully Entangled ===
+# DCI Disentanglement: 0.1241
+# MIG Score: 0.0000
+# Total Correlation (TC): 1.6568
+# SAP Score: 0.9949
 
 

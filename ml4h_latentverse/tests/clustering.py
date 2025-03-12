@@ -25,17 +25,14 @@ def run_clustering(representations, labels, num_clusters=None, plots=False):
     Returns:
         dict: Clustering evaluation metrics.
     """
-    # Convert Pandas DataFrame to NumPy if necessary
     if isinstance(representations, pd.DataFrame):
         representations = representations.to_numpy()
     if isinstance(labels, pd.DataFrame):
-        labels = labels.to_numpy().reshape(-1)  # Ensure labels are 1D
+        labels = labels.to_numpy().reshape(-1)
 
-    # Ensure labels exist and have correct shape
     labels = np.asarray(labels) 
     has_labels = labels is not None and len(labels) > 0
     
-     # Determine number of clusters
     if num_clusters is None:
         if has_labels:
             num_clusters = len(np.unique(labels))  # Use labels if no num_clusters is given
@@ -47,11 +44,9 @@ def run_clustering(representations, labels, num_clusters=None, plots=False):
         labels, representations = labels[mask], representations[mask]
         labels = labels.astype(int)
 
-    # Run KMeans clustering
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
     cluster_labels = kmeans.fit_predict(representations)
 
-    # Compute NMI only if labels exist and match cluster labels in length
     nmi = None
     if has_labels and labels.shape[0] == cluster_labels.shape[0]:
         nmi = normalized_mutual_info_score(labels, cluster_labels)
@@ -74,7 +69,6 @@ def run_clustering(representations, labels, num_clusters=None, plots=False):
         "Cluster Learnability": cl_score
     }
 
-    # Optional visualization
     plot_url = None
     if plots:
         plot_url = visualize_clusterings(representations, cluster_labels, labels, num_clusters)
@@ -97,17 +91,11 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
     plt.figure(figsize=(8, 6))
     markers = ['o', '.', ',', 'x', '+', '*', 'v', '^', '<', '>', 's', 'p', 'h', 'H', 'D', 'd', '|', '_']
 
-    
-    # Compute first two principal components (PCA)
     pca = PCA(n_components=2)
     pca_rep = pca.fit_transform(representations)
 
-    # Define color palette based on number of clusters
     colors = sns.color_palette('tab10', n_colors=10)
-
-    # Plot each cluster with its unique color
-    # for cluster_idx in range(num_clusters):
-    #     cluster_mask = cluster_labels == cluster_idx
+    
     print(labels, "labels")
     print(cluster_labels, "cluster_labels")
     hue = [colors[l] for l in cluster_labels] if labels is None else [colors[l] for l in labels]
@@ -116,7 +104,6 @@ def visualize_clusterings(representations, cluster_labels, labels=None, num_clus
         y=pca_rep[:, 1],
         hue=hue,
         markers=markers,
-        # label=f'Cluster {}',
         alpha=0.4
     )
 
