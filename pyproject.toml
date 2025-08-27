@@ -4,9 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ml4h-latentverse"
-version = "0.1.0"
+version = "0.2.0"
 description = "Evaluation library for latent representations"
-authors = [{ name = "Yoanna Turura", email = "yturura@broadinstitute.org" }]
+authors = [{ name = "Yoanna Turura", email = "yturura@broadinstitute.org" }, 
+{ name = "Majd Alafrange", email = "majd@mit.edu" }]
 dynamic = ["requires-python"]
 dependencies = [
     "numpy",

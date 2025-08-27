@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
+# import os
 from ml4h_latentverse.utils import fit_logistic, fit_linear
 
-PLOTS_DIR = "static/plots"
-os.makedirs(PLOTS_DIR, exist_ok=True)
+# PLOTS_DIR = "static/plots"
+# os.makedirs(PLOTS_DIR, exist_ok=True)
 
 def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percent_to_remove_list=[0, 5, 10, 20], verbose=False, plots=True):
     """
@@ -34,15 +34,7 @@ def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percen
         representations = representations.reshape(-1, 1)
 
     representations = np.nan_to_num(representations)
-
     representations = (representations - representations.mean(axis=0)) / representations.std(axis=0)
-
-    # Compute pairwise correlation and rank most correlated pairs
-    correlation_matrix = np.corrcoef(representations, rowvar=False)
-    correlation_pairs = sorted(
-        [(i, j, abs(correlation_matrix[i, j])) for i in range(correlation_matrix.shape[1]) for j in range(i + 1, correlation_matrix.shape[1])],
-        key=lambda x: x[2], reverse=True
-    )
 
     results = {}
 
@@ -87,24 +79,17 @@ def run_expressiveness(representations, labels, folds=4, train_ratio=0.6, percen
     for label_name in label_scores:
         results[label_name] = {percent: np.mean(scores) for percent, scores in label_scores[label_name].items()}
 
-    plot_url = None
-    if plots:
-        plt.figure(figsize=(8, 6))
-
-        for label_name, metric_data in results.items():
-            plt.plot(percent_to_remove_list, [metric_data[percent] for percent in percent_to_remove_list], marker='o', label=label_name)
-
-        plt.xlabel("Percentage of Dimensions Removed", fontsize=14)
-        plt.ylabel("Metric Score (AUC or R²)", fontsize=14)
-        plt.title("Expressiveness Test Across Labels", fontsize=16)
-        plt.legend()
-        plt.grid(True)
-
-        plot_filename = "expressiveness.png"
-        plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
-        plt.savefig(plot_filepath)
-        plt.close()
-
-        plot_url = f"/static/plots/{plot_filename}"
-
-    return {"metrics": results, "plot_url": plot_url}
+    plot_data = {
+        "x_label": "Percentage of Dimensions Removed",
+        "y_label": "Metric Score (AUC or R²)",
+        "traces": []
+    }
+    
+    for label_name, metric_data in results.items():
+        plot_data["traces"].append({
+            "name": label_name,
+            "x": percent_to_remove_list,
+            "y": [metric_data[percent] for percent in percent_to_remove_list]
+        })
+        
+    return {"metrics": results, "plot_data": plot_data}

@@ -1,16 +1,11 @@
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set()
-import os
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, LogisticRegression # CHANGED: Add LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 
-PLOTS_DIR = "static/plots"
-os.makedirs(PLOTS_DIR, exist_ok=True)
 
 def run_probing(representations, labels, train_ratio=0.6):
     """
@@ -53,8 +48,9 @@ def run_probing(representations, labels, train_ratio=0.6):
         representations, labels, train_size=train_ratio, random_state=42
     )
 
+    # CHANGED: Use LogisticRegression for classification and Ridge for regression
     model_configs = {
-        "Linear Regression": Ridge(),
+        "Linear Model": LogisticRegression(max_iter=500) if is_categorical else Ridge(),
         "1-layer MLP": MLPClassifier(hidden_layer_sizes=(32), max_iter=500) if is_categorical else MLPRegressor(hidden_layer_sizes=(32), max_iter=500),
         "5-layer MLP": MLPClassifier(hidden_layer_sizes=(64, 32, 32, 16, 8), max_iter=500) if is_categorical else MLPRegressor(hidden_layer_sizes=(64, 32, 32, 16, 8), max_iter=500),
         "10-layer MLP": MLPClassifier(hidden_layer_sizes=(128, 64, 64, 64, 64, 32, 32, 32, 32), max_iter=500) if is_categorical else MLPRegressor(hidden_layer_sizes=(128, 64, 64, 64, 64, 32, 32, 32, 32), max_iter=500),
@@ -74,39 +70,58 @@ def run_probing(representations, labels, train_ratio=0.6):
     
         if is_categorical:
             if hasattr(model, "predict_proba"):
-                auroc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
+                y_pred = model.predict(X_test)
+                y_pred_proba = model.predict_proba(X_test)[:, 1]
+                auroc = roc_auc_score(y_test, y_pred_proba)
+                acc = accuracy_score(y_test, y_pred)
             else:
+                # Fallback for models without predict_proba
+                y_pred = model.predict(X_test)
                 auroc = None
-            acc = accuracy_score(y_test, preds)
-            r2 = None  # Not applicable for classification
+                acc = accuracy_score(y_test, y_pred)
+            r2 = None
         else:
-            auroc = None  # Not applicable for regression
+            y_pred = model.predict(X_test)
+            auroc = None
             acc = None
-            r2 = r2_score(y_test, preds)
+            r2 = r2_score(y_test, y_pred)
 
         metrics["Model Complexity"].append(model_name)
         metrics["AUROC"].append(auroc)
         metrics["Accuracy"].append(acc)
         metrics["R²"].append(r2)
 
-    plot_filename = "probing_complexity.png"
-    plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
-
-    plt.figure(figsize=(8, 6))
+    # CHANGED: Remove all plotting code and return structured data instead
+    plot_data = {
+        "x_label": "Model Complexity",
+        "y_label": "Performance Metric",
+        "traces": []
+    }
+    
     if any(metrics["AUROC"]):
-        sns.lineplot(x=metrics["Model Complexity"], y=metrics["AUROC"], marker="o", label="AUROC")
+        plot_data["traces"].append({
+            "name": "AUROC",
+            "x": metrics["Model Complexity"],
+            "y": metrics["AUROC"]
+        })
     if any(metrics["Accuracy"]):
-        sns.lineplot(x=metrics["Model Complexity"], y=metrics["Accuracy"], marker="o", label="Accuracy")
+        plot_data["traces"].append({
+            "name": "Accuracy",
+            "x": metrics["Model Complexity"],
+            "y": metrics["Accuracy"]
+        })
     if any(metrics["R²"]):
-        sns.lineplot(x=metrics["Model Complexity"], y=metrics["R²"], marker="o", label="R² Score")
+        plot_data["traces"].append({
+            "name": "R² Score",
+            "x": metrics["Model Complexity"],
+            "y": metrics["R²"]
+        })
 
-    plt.xlabel("Model Complexity")
-    plt.ylabel("Performance Metric")
-    plt.title("Probing Performance Across Model Complexities")
-    plt.legend()
-    plt.grid(True)
-    plt.xticks(rotation=30)
-    plt.savefig(plot_filepath)
-    plt.close()
+    return {"metrics": metrics, "plot_data": plot_data}
 
-    return {"metrics": metrics, "plot_url": f"/{plot_filepath}"}
+
+# Analysis of the Code
+
+ # Incorrect Model Selection: The code uses Ridge() for all labels, even when is_categorical is true. Ridge() is a regression model and is not designed for classification tasks. It lacks a predict_proba method, which will cause the AUROC metric calculation to be skipped. The correct approach is to use a classification model like LogisticRegression.
+
+# Incorrect Data Type Conversion: The line preds = model.predict(X_test).astype(int) incorrectly converts predictions to integers for both regression and classification. This is fine for classification but will lose precision and produce meaningless results for a regression task.

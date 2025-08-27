@@ -57,7 +57,15 @@ def run_disentanglement(representations, labels):
 
     results["TC"] = compute_total_correlation(representations)
 
-    return results
+    plot_data = {
+        "x": [f"Dimension {i}" for i in range(representations.shape[1])],
+        "y": ["Generative Factor"],  # Only one generative factor (the labels)
+        "z": I_matrix.T.tolist(),# The mutual information values
+        "x_label": "Latent Dimensions",
+        "y_label": "Generative Factor"
+    }
+
+    return {"metrics": results, "plot_data": plot_data} # CHANGED: Return plot_data
 
 def compute_total_correlation(representations):
     """
@@ -123,10 +131,10 @@ def compute_informativeness_score(representations, labels, is_continuous):
     y_train, y_test = labels[train_idx], labels[test_idx]
 
     if is_continuous:
-        clf = make_pipeline([
+        clf = make_pipeline(
             ("scaler", StandardScaler()),
-            ("regressor", MLPRegressor(hidden_layer_sizes=(64, 32, 16), max_iter=1000, random_state=42))
-        ])
+            ("regressor", MLPRegressor(hidden_layer_sizes=(64, 32, 16), max_iter=1000, random_state=42)),
+        )
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test)
         informativeness = 1 - (np.mean((y_test-y_pred)**2) / np.var(y_test))
@@ -135,3 +143,7 @@ def compute_informativeness_score(representations, labels, is_continuous):
         informativeness = metrics['AUROC']
         
     return informativeness
+
+
+
+

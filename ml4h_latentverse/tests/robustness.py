@@ -77,24 +77,18 @@ def run_robustness(representations, labels, noise_levels, metric="clustering", p
                 noisy_scores[key] = []
             noisy_scores[key].append(extract_numeric(value))
         
-    plot_url = None
-    if plots:
-        plt.figure(figsize=(8, 6))
-        for key, values in noisy_scores.items():
-            if values and all(np.isfinite(v) for v in values):
-                plt.plot(noise_levels, values, marker="o", label=key)
-            else:
-                print(f"Skipping {key} due to non-numeric values: {values}")
-        plt.xlabel("Noise Level", fontsize=14)
-        plt.ylabel("Performance Score", fontsize=14)
-        plt.title(f"Representation Robustness ({metric.capitalize()})", fontsize=16)
-        plt.legend()
-        plt.grid()
-        plot_filename = f"robustness_{metric}.png"
-        plot_filepath = os.path.join(PLOTS_DIR, plot_filename)
-        plt.savefig(plot_filepath, format="png", dpi=300)
-        plt.close()
-        if os.path.exists(plot_filepath):
-            plot_url = f"/static/plots/{plot_filename}"
-    print(f"Debugging Robustness: {noisy_scores}")    
-    return {"metrics": noisy_scores, "plot_url": plot_url}
+    plot_data = {
+        "x_label": "Noise Level",
+        "y_label": "Performance Score",
+        "traces": []
+    }
+    for key, values in noisy_scores.items():
+        if values and all(np.isfinite(v) for v in values):
+            plot_data["traces"].append({
+                "x": noise_levels,
+                "y": values,
+                "name": key
+            })
+    
+    # The 'metrics' key in the final return is populated by noisy_scores
+    return {"metrics": noisy_scores, "plot_data": plot_data}
