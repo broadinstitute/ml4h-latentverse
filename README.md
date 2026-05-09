@@ -1,4 +1,4 @@
-# ml4h-latentverse
+# latentverse
 
 A Python library for evaluating the quality of latent representations. Five
 core tests, plus a separate module for decoupling multimodal embeddings.
@@ -38,11 +38,18 @@ pip install -e ".[dev]"
 
 Requires Python ≥ 3.9.
 
+> Note: the package was previously published on PyPI as
+> `ml4h-latentverse` (last release 0.1.2, March 2025) under an account
+> we no longer have access to. The repo lives on at the same URL; new
+> releases will go out as `latentverse` on PyPI under a fresh account.
+> Until that first PyPI release, install directly from git as shown
+> above.
+
 ## Quick example
 
 ```python
 import numpy as np
-from ml4h_latentverse import run_clustering
+from latentverse import run_clustering
 
 # 200 samples, 32 latent dims, 4 ground-truth classes
 reps = np.random.randn(200, 32)
@@ -65,14 +72,14 @@ synthetic data in under 30 seconds, see `examples/run_cli.py`.
 ## API
 
 ```python
-from ml4h_latentverse import (
+from latentverse import (
     run_clustering,
     run_disentanglement,
     run_expressiveness,
     run_robustness,
     run_probing,
 )
-from ml4h_latentverse.multiloreft import MultiLoReFTProjector
+from latentverse.multiloreft import MultiLoReFT
 ```
 
 Each test returns a `dict` containing a `"results"` block (numeric metrics)
@@ -81,13 +88,13 @@ arrays you can render however you want).
 
 For the full per-function signature and what each metric means,
 docstrings on the entrypoints are the source of truth — open
-`ml4h_latentverse/tests/clustering.py` (or any other test file) and read
+`src/latentverse/evaluations/clustering.py` (or any other test file) and read
 the function header.
 
 ## Tests
 
 ```bash
-pytest tests/
+pytest
 ```
 
 `tests/test_smoke.py` is a small contract-style suite that verifies every
@@ -97,20 +104,25 @@ public API promises. It runs in a few seconds on CPU.
 ## Layout
 
 ```
-ml4h_latentverse/
-├── __init__.py             public re-exports
-├── utils.py                shared helpers (encoding, MI, etc.)
-├── tests/
-│   ├── clustering.py       run_clustering
-│   ├── disentanglement.py  run_disentanglement
-│   ├── expressiveness.py   run_expressiveness
-│   ├── robustness.py       run_robustness
-│   └── probing.py          run_probing, run_probing_fast
-└── multiloreft/
-    ├── multimodal_projector.py   MultiLoReFTProjector
-    └── losses.py
-examples/run_cli.py         end-to-end demo on synthetic data
-tests/test_smoke.py         contract / smoke tests
+latentverse/                            (src-layout: real package lives in src/)
+├── pyproject.toml
+├── README.md
+├── LICENSE
+├── CHANGELOG.md
+├── examples/run_cli.py                 end-to-end demo on synthetic data
+├── src/latentverse/
+│   ├── __init__.py                     public re-exports
+│   ├── utils.py                        shared helpers (encoding, MI, etc.)
+│   ├── evaluations/
+│   │   ├── clustering.py               run_clustering
+│   │   ├── disentanglement.py          run_disentanglement
+│   │   ├── expressiveness.py           run_expressiveness
+│   │   ├── robustness.py               run_robustness
+│   │   └── probing.py                  run_probing, run_probing_fast
+│   └── multiloreft/
+│       ├── multimodal_projector.py     MultiLoReFT
+│       └── losses.py
+└── tests/test_smoke.py                 contract / smoke tests
 ```
 
 ## License

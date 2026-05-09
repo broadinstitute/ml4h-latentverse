@@ -14,7 +14,7 @@ Run:
 import numpy as np
 import pytest
 
-from ml4h_latentverse import (
+from latentverse import (
     run_clustering,
     run_disentanglement,
     run_expressiveness,
@@ -163,4 +163,4 @@ def test_run_robustness_clustering_metric():
 # expensive enough that we don't run it in CI by default.
 # ---------------------------------------------------------------------------
 def test_multiloreft_importable():
-    from ml4h_latentverse.multiloreft import MultiLoReFT  # noqa: F401
+    from latentverse.multiloreft import MultiLoReFT  # noqa: F401
