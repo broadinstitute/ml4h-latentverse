@@ -12,6 +12,7 @@ license = { text = "MIT" }
 authors = [
     { name = "Yoanna Turura", email = "yturura@broadinstitute.org" },
     { name = "Majd Alafrange", email = "majd@mit.edu" },
+    { name = "Sana Tonekaboni" },
 ]
 dependencies = [
     "numpy>=1.24",

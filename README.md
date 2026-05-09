@@ -1,151 +1,122 @@
-# Latentverse: Evaluation library for latent representations
+# ml4h-latentverse
 
-Latentverse is a library for evaluating the quality and reliability of latent representations. In includes a variety of evaluation tests to measure the following properties of latent representations:
+A Python library for evaluating the quality of latent representations. Five
+core tests, plus a separate module for decoupling multimodal embeddings.
 
-- Clusterability: How well the representations form distinct clusters
-- Predictability: The ability to use representations for downstream prediction tasks
-- Disentanglement: The extent to which latent dimensions capture independent factors of variation
-- Robustness: The resilience of representations under perturbations
-- Expressiveness: How well latent representations capture relevant information
+The five tests, in brief:
 
+| Test | What it asks |
+|---|---|
+| **Clusterability** | Do these representations form meaningful clusters? Optional ground-truth labels enable NMI / Cluster Learnability; without labels you still get Silhouette + Davies–Bouldin. |
+| **Disentanglement** | How independent are the latent dimensions? Reports DCI, MIG, Total Correlation, SAP. |
+| **Expressiveness** | How much of the label signal is recoverable from the representations, and how does that signal degrade as you remove highly-correlated dimensions? |
+| **Robustness** | What happens to performance under Gaussian noise of varying magnitude? Pick `metric="clustering"` or `metric="probing"`. |
+| **Probing** | Train classifiers / regressors of varying complexity on the representations and see how well they recover the labels. Auto-detects task type. |
 
-## Installation
-Latentverse is available on PyPI. You can install it using:
+The `multiloreft` submodule trains a small projector to push two
+correlated modalities apart in latent space; it's useful when you want
+"image-only" and "text-only" embeddings out of a model that learned them
+jointly.
+
+There's also a companion webapp at https://latentverse-web-783282864357.us-central1.run.app/ that
+puts a UI in front of all of this; the library itself has no webapp
+dependencies.
+
+## Install
 
 ```bash
-pip install ml4h-latentverse
+pip install git+https://github.com/broadinstitute/ml4h-latentverse.git
 ```
 
-Alternatively, if you are developing or modifying the package, clone the repository and install it in editable mode:
+For development:
+
 ```bash
 git clone https://github.com/broadinstitute/ml4h-latentverse.git
 cd ml4h-latentverse
-pip install -e .
+pip install -e ".[dev]"
 ```
 
-## Setting up the environment 
-It is recommended to use a virtual environment:
+Requires Python ≥ 3.9.
+
+## Quick example
+
+```python
+import numpy as np
+from ml4h_latentverse import run_clustering
+
+# 200 samples, 32 latent dims, 4 ground-truth classes
+reps = np.random.randn(200, 32)
+labels = np.random.randint(0, 4, 200)
+
+result = run_clustering(reps, labels, random_state=42)
+print(result["results"])
+# -> {"Silhouette Score": ..., "Normalized Mutual Information": ...,
+#     "Davies-Bouldin Index": ..., "Cluster Learnability": ...}
+```
+
+Every test entrypoint takes a `random_state` keyword for reproducibility.
+Where it makes sense (clusterability, robustness-clustering) you can also
+pass `num_clusters` to override the auto-derived value, and
+`standardize=True` to z-score the inputs before evaluation.
+
+For a complete end-to-end demo that runs all five tests + multimodal on
+synthetic data in under 30 seconds, see `examples/run_cli.py`.
+
+## API
+
+```python
+from ml4h_latentverse import (
+    run_clustering,
+    run_disentanglement,
+    run_expressiveness,
+    run_robustness,
+    run_probing,
+)
+from ml4h_latentverse.multiloreft import MultiLoReFTProjector
+```
+
+Each test returns a `dict` containing a `"results"` block (numeric metrics)
+and, when `plots=True`, a `"plot_url"` (image path) or `"plot_data"` (raw
+arrays you can render however you want).
+
+For the full per-function signature and what each metric means,
+docstrings on the entrypoints are the source of truth — open
+`ml4h_latentverse/tests/clustering.py` (or any other test file) and read
+the function header.
+
+## Tests
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # for MacOS/Linux
-venv\Scripts\activate  # for Windows
+pytest tests/
 ```
 
-Then, install the required dependencies:
-```bash
-pip install -r requirements.txt
+`tests/test_smoke.py` is a small contract-style suite that verifies every
+entrypoint runs end-to-end on synthetic data and returns the keys the
+public API promises. It runs in a few seconds on CPU.
+
+## Layout
+
+```
+ml4h_latentverse/
+├── __init__.py             public re-exports
+├── utils.py                shared helpers (encoding, MI, etc.)
+├── tests/
+│   ├── clustering.py       run_clustering
+│   ├── disentanglement.py  run_disentanglement
+│   ├── expressiveness.py   run_expressiveness
+│   ├── robustness.py       run_robustness
+│   └── probing.py          run_probing, run_probing_fast
+└── multiloreft/
+    ├── multimodal_projector.py   MultiLoReFTProjector
+    └── losses.py
+examples/run_cli.py         end-to-end demo on synthetic data
+tests/test_smoke.py         contract / smoke tests
 ```
 
-## Evaluating representations
+## License
 
-# 1. Clusterability Test
-This test evaluates how well representations cluster given a specified number of clusters. The test computes metrics such as Normalized Mutual Information (NMI), Silhouette Score, Davies-Bouldin Index, and Cluster Learnability.
+MIT. See `LICENSE`.
 
-Example usage below:
-```bash
-from ml4h_latentverse.tests.clustering import run_clustering
+## Authors
 
-representations = ...  # Load or generate your latent representations
-labels = ...  # Corresponding labels for evaluation
-
-results = run_clustering(representations=representations, labels=labels, num_clusters=2, plots=True)
-print(results)
-```
-
-Expected inputs:
-- representations (ndarray): Feature representations for clustering
-- num_clusters (int, optional): Number of clusters (ignored if labels are provided)
-- labels (ndarray, optional): True labels (used for evaluation)
-- plots (bool, optional): Whether to generate clustering visualization
-
-
-# 2. Disentanglement Test
-This test measures how well the latent dimensions capture independent factors of variation. It computes metrics such as DCI Disentanglement, Mutual Information Gap (MIG), Total Correlation (TC), and SAP Score.
-
-Example usage:
-```bash
-from ml4h_latentverse.tests.disentanglement import run_disentanglement
-
-data, labels = ...  # Load or generate latent representations and labels
-results = run_disentanglement(data, labels)
-print(results)
-```
-Expected inputs:
-- representations: A (N, D) array of latent space representation
-- labels: A (N,) array of ground truth labels
-
-# 3. Expressiveness Test
-This test evaluates how much information the representations contain about labels. It assesses the impact of removing highly correlated features on prediction performance using AUC or R² scores.
-
-Example usage:
-```bash
-from ml4h_latentverse.tests.expressiveness import run_expressiveness
-
-data, labels = ...  # Load or generate data
-results = run_expressiveness(data, labels, percent_to_remove_list=[0, 10, 20, 50], plots=True)
-print(results)
-```
-
-Expected inputs:
-- representations: (N, D) array of feature representations
-- labels: (N, P) array of target labels (P phenotypes)
-- folds: Number of cross-validation folds
-- train_ratio: Ratio of data used for training
-- percent_to_remove_list: List of percentages of highly correlated dimensions to remove
-- verbose: If True, prints training details
-- plots: If True, generates and saves a performance plot
-
-
-# 4. Robustness Test
-This test examines how well representations withstand perturbations by introducing Gaussian noise and measuring clustering or probing performance.
-
-Example usage:
-```bash
-from ml4h_latentverse.tests.robustness import run_robustness
-
-data, labels = ...  # Load or generate data
-results = run_robustness(data, labels, noise_levels=[0.1, 0.5, 1.0, 1.5], metric="clustering", plots=True)
-print(results)
-```
-
-Expected inputs:
-- representations: (N, D) matrix (or DataFrame) of latent representations
-- labels: (N,) array (or DataFrame) of target labels
-- noise_levels: List of noise magnitudes to apply
-- metric: "clustering" or "probing"
-- plots: If True, generate a performance plot
-
-# 5. Probing Test
-This test measures representation quality by training classifiers or regressors of varying complexity.
-
-Example usage:
-```bash
-from ml4h_latentverse.tests.probing import run_probing
-
-data, labels = ...  # Load or generate data
-results = run_probing(data, labels)
-print(results)
-```
-
-Expected inputs:
-- representations (ndarray or DataFrame): Feature representations
-- labels (ndarray or DataFrame): Labels for probing
-- train_ratio (float): Ratio of train to test data
-
-
-## Testing the Evaluation Suite
-To validate the test suite, you can use the provided test cases:
-
-Example usage:
-```bash
-from ml4h_latentverse.tests.test import test_clusterability, test_disentanglement, test_expressiveness, test_robustness
-
-test_clusterability()
-test_disentanglement()
-test_expressiveness()
-test_robustness()
-```
-
-
-
-
+Yoanna Turura · Majd Alafrange · Sana Tonekaboni. Broad Institute, ML4H.
