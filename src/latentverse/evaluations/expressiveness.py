@@ -3,7 +3,14 @@ import pandas as pd
 import matplotlib
 
 matplotlib.use("Agg")
-from latentverse.utils import fit_logistic, fit_linear
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score
+from latentverse.utils import (
+    detect_task_type,
+    fit_linear,
+    fit_logistic,
+    random_baseline,
+)
 
 # QUICK WIN #3: Joblib parallelization (4-8x speedup on multi-core systems)
 try:
@@ -13,6 +20,32 @@ try:
 except ImportError:
     HAS_JOBLIB = False
     print("Warning: joblib not installed. Install with: pip install joblib")
+
+
+# Map task type -> (metric name, primary-score key, fit-and-score callable).
+# The fit callable returns the scalar score for that fold.
+def _binary_score(X_train, X_test, y_train, y_test, verbose=False):
+    return fit_logistic(X_train, X_test, y_train, y_test, verbose)["AUROC"]
+
+
+def _regression_score(X_train, X_test, y_train, y_test, verbose=False):
+    return fit_linear(X_train, X_test, y_train, y_test, verbose)["R²"]
+
+
+def _multiclass_score(X_train, X_test, y_train, y_test, verbose=False):
+    # Multinomial logistic + macro-F1 mirrors how the probing test reports
+    # multiclass performance, so the SPA's metric-name handling stays uniform.
+    clf = LogisticRegression(max_iter=500, multi_class="auto")
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    return f1_score(y_test, y_pred, average="macro")
+
+
+_TASK_DISPATCH = {
+    "binary": ("AUROC", _binary_score),
+    "multiclass": ("F1 (macro)", _multiclass_score),
+    "regression": ("R²", _regression_score),
+}
 
 
 def run_expressiveness(
@@ -26,48 +59,38 @@ def run_expressiveness(
     random_state=42,
 ):
     """
-    OPTIMIZED: Evaluates the expressiveness of learned representations by measuring performance (AUC or R²)
-    as high-variance dimensions are removed.
+    Evaluate the expressiveness of learned representations by measuring how
+    predictive performance degrades as high-variance dimensions are removed.
 
-    This test reports two expressiveness concepts:
-    - Compactness: how quickly performance degrades when removing high-variance dimensions.
-    - Intrinsic Dimension: number of high-variance dimensions removed before performance drops
-      beyond a fixed tolerance from baseline.
+    Reports two derived numbers per label:
+      * Compactness     — average normalised drop across the removal sweep.
+      * Intrinsic Dim.  — number of dims removable before performance falls
+                          5% below baseline.
 
-    PHASE 1 IMPROVEMENTS:
-    - Parallel fold processing (4-8x speedup)
-    - Pre-normalized representations (avoid repeated operations)
+    The metric used for "performance" is picked from the labels:
+      * binary labels     → AUROC
+      * multiclass labels → macro-F1
+      * continuous labels → R²
 
-    Parameters:
-    - representations: (N, D) array of feature representations
-    - labels: (N, P) array of target labels (P labels)
-    - folds: Number of cross-validation folds
-    - train_ratio: Ratio of data used for training
-    - percent_to_remove_list: List of percentages of high-variance dimensions to remove
-    - verbose: If True, prints training details
-    - plots: If True, generates and saves a performance plot
-
-    Returns:
-    - dict: Contains performance scores and the plot URL
+    Each label also gets a `Random Baseline` value derived from the actual
+    label distribution (majority-class frequency for Accuracy, 0.5 for AUROC,
+    one-permutation macro-F1 for F1, 0 for R²) so the frontend can draw a
+    chance reference line that's correct under class imbalance.
     """
     if isinstance(representations, pd.DataFrame):
         representations = representations.to_numpy()
     if isinstance(labels, pd.DataFrame):
         labels = labels.to_numpy()
 
-    # FIX: Force conversion to numpy float64 arrays to handle PyArrow arrays
     representations = np.array(representations, dtype=np.float64)
     if representations.ndim == 1:
         representations = representations.reshape(-1, 1)
 
-    # Pre-normalize once (don't repeat in loop)
     representations = np.nan_to_num(representations)
     representations_raw = representations.copy()
     rep_std = representations_raw.std(axis=0)
-    rep_std[rep_std == 0] = 1.0  # Avoid division by zero
+    rep_std[rep_std == 0] = 1.0
     representations = (representations_raw - representations_raw.mean(axis=0)) / rep_std
-
-    results = {}
 
     if labels.ndim == 1:
         labels = labels.reshape(-1, 1)
@@ -79,8 +102,8 @@ def run_expressiveness(
     }
     label_metric_types = {}
     label_dim_counts = {}
+    label_baselines = {}
 
-    # Process each label
     for label_idx, label_name in enumerate(label_names):
         y = labels[:, label_idx]
 
@@ -89,35 +112,31 @@ def run_expressiveness(
         X = representations[mask, :]
         X_raw = representations_raw[mask, :]
 
-        is_categorical = len(np.unique(y)) <= 2
-        label_metric_types[label_name] = "AUROC" if is_categorical else "R²"
-        label_dim_counts[label_name] = X.shape[1]
+        task_type = detect_task_type(y)
+        metric_type, score_fn = _TASK_DISPATCH[task_type]
 
-        # Rank dimensions by variance (high-variance removal)
+        label_metric_types[label_name] = metric_type
+        label_dim_counts[label_name] = X.shape[1]
+        label_baselines[label_name] = random_baseline(y, metric_type)
+
         feature_variance = np.var(X_raw, axis=0)
         variance_order = np.argsort(feature_variance)[::-1]
 
         for percent_to_remove in percent_to_remove_list:
-            # FIX: Handle 0% removal correctly (baseline should use all dimensions)
             if percent_to_remove == 0:
                 num_dims_to_remove = 0
             else:
-                # Calculate number of dimensions to remove
                 num_dims_to_remove = int((percent_to_remove / 100) * X.shape[1])
-                # Ensure at least 1 dimension is removed when percent > 0
                 num_dims_to_remove = max(1, num_dims_to_remove)
-                # Cap to leave at least 1 dimension
                 num_dims_to_remove = min(num_dims_to_remove, X.shape[1] - 1)
 
-            # Remove highest-variance dimensions
             dims_to_remove = (
                 set(variance_order[:num_dims_to_remove]) if num_dims_to_remove > 0 else set()
             )
 
-            # OPTIMIZATION: Parallelize folds if joblib available
             def process_fold(fold_idx):
                 indices = np.arange(len(y))
-                np.random.seed(random_state + fold_idx)  # Reproducible randomness
+                np.random.seed(random_state + fold_idx)
                 np.random.shuffle(indices)
                 train_size = int(len(y) * train_ratio)
                 train_idx, test_idx = indices[:train_size], indices[train_size:]
@@ -129,42 +148,37 @@ def run_expressiveness(
                     X_train = np.delete(X_train, list(dims_to_remove), axis=1)
                     X_test = np.delete(X_test, list(dims_to_remove), axis=1)
 
-                metrics = (
-                    fit_logistic(X_train, X_test, y_train, y_test, verbose)
-                    if is_categorical
-                    else fit_linear(X_train, X_test, y_train, y_test, verbose)
-                )
-                return metrics["AUROC" if is_categorical else "R²"]
+                return score_fn(X_train, X_test, y_train, y_test, verbose)
 
             if HAS_JOBLIB and folds > 1:
-                # Parallel execution (4-8x speedup on multi-core)
                 fold_results = Parallel(n_jobs=-1, backend="threading")(
                     delayed(process_fold)(fold_idx) for fold_idx in range(folds)
                 )
                 label_scores[label_name][percent_to_remove].extend(fold_results)
             else:
-                # Sequential fallback
                 for fold_idx in range(folds):
-                    score = process_fold(fold_idx)
-                    label_scores[label_name][percent_to_remove].append(score)
+                    label_scores[label_name][percent_to_remove].append(
+                        process_fold(fold_idx)
+                    )
 
-    # Build clear, descriptive metrics output
     formatted_results = {}
+    raw_curves = {}
 
     for label_name in label_scores:
         metric_type = label_metric_types.get(label_name, "AUROC or R²")
         total_dims = label_dim_counts.get(label_name, 0)
+        baseline_value = label_baselines.get(label_name)
 
         label_metrics = {}
         scores_by_percent = {
-            percent: np.mean(scores)
+            percent: float(np.mean(scores))
             for percent, scores in label_scores[label_name].items()
         }
 
-        # Add metric type
         label_metrics["Metric Type"] = metric_type
+        if baseline_value is not None:
+            label_metrics["Random Baseline"] = round(baseline_value, 4)
 
-        # Add performance at each removal level with clear labels
         for percent in percent_to_remove_list:
             score = scores_by_percent[percent]
             if percent == 0:
@@ -172,7 +186,6 @@ def run_expressiveness(
             else:
                 label_metrics[f"{percent}% Removed"] = round(score, 4)
 
-        # Compactness: how quickly performance drops when removing high-variance dims
         baseline = scores_by_percent.get(0)
         if baseline is not None and baseline != 0:
             normalized_scores = [
@@ -183,7 +196,6 @@ def run_expressiveness(
         else:
             label_metrics["Compactness"] = "N/A"
 
-        # Intrinsic Dimension: number of high-variance dims removed before >5% drop
         if baseline is not None and baseline != 0 and total_dims > 0:
             threshold = baseline * 0.95
             intrinsic_dim = None
@@ -203,28 +215,36 @@ def run_expressiveness(
             label_metrics["Intrinsic Dimension"] = "N/A"
 
         formatted_results[label_name] = label_metrics
-
-        # Also keep raw results for plotting
-        results[label_name] = scores_by_percent
+        raw_curves[label_name] = scores_by_percent
 
     metric_types = set(label_metric_types.values())
     if len(metric_types) == 1:
-        y_label = f"Predictive Performance ({metric_types.pop()})"
+        only_metric = next(iter(metric_types))
+        y_label = f"Predictive Performance ({only_metric})"
     else:
-        y_label = "Predictive Performance (AUROC or R²)"
+        only_metric = None
+        y_label = "Predictive Performance (mixed metrics)"
 
     plot_data = {
         "x_label": "Percentage of Dimensions Removed (%)",
         "y_label": y_label,
+        "metric_type": only_metric,
+        "random_baseline": (
+            list(label_baselines.values())[0]
+            if len(label_baselines) == 1 and list(label_baselines.values())[0] is not None
+            else None
+        ),
         "traces": [],
     }
 
-    for label_name, metric_data in results.items():
+    for label_name, metric_data in raw_curves.items():
         plot_data["traces"].append(
             {
                 "name": label_name,
                 "x": percent_to_remove_list,
                 "y": [metric_data[percent] for percent in percent_to_remove_list],
+                "metric_type": label_metric_types.get(label_name),
+                "random_baseline": label_baselines.get(label_name),
             }
         )
 
