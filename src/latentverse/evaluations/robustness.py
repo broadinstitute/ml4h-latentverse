@@ -3,10 +3,6 @@ import pandas as pd
 import matplotlib
 
 matplotlib.use("Agg")
-import os
-
-PLOTS_DIR = "static/plots"
-os.makedirs(PLOTS_DIR, exist_ok=True)
 
 # QUICK WIN: Joblib parallelization for noise levels
 try:
