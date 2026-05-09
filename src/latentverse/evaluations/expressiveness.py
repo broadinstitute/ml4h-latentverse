@@ -35,7 +35,9 @@ def _regression_score(X_train, X_test, y_train, y_test, verbose=False):
 def _multiclass_score(X_train, X_test, y_train, y_test, verbose=False):
     # Multinomial logistic + macro-F1 mirrors how the probing test reports
     # multiclass performance, so the SPA's metric-name handling stays uniform.
-    clf = LogisticRegression(max_iter=500, multi_class="auto")
+    # `multi_class` was removed in sklearn 1.7 — sklearn now auto-picks the
+    # right strategy based on the solver and number of classes.
+    clf = LogisticRegression(max_iter=500)
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
     return f1_score(y_test, y_pred, average="macro")
