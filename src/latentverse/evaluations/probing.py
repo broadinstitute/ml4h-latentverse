@@ -49,6 +49,16 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
     labels = labels[mask]
     representations = representations[mask, :]
 
+    # A probe needs at least 2 classes to be meaningful. Fail loudly here
+    # so users see an actionable message instead of MLPs trivially
+    # predicting the only class and reporting 1.0 accuracy on a degenerate
+    # input.
+    if len(np.unique(labels)) < 2:
+        raise ValueError(
+            "probing requires at least 2 distinct classes; "
+            f"got {len(np.unique(labels))} unique label value(s)."
+        )
+
     task_type = detect_task_type(labels)
     is_classification = task_type in ("binary", "multiclass")
     is_binary = task_type == "binary"
@@ -64,17 +74,19 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
     else:
         print(f"Label range: [{labels.min():.2f}, {labels.max():.2f}]")
 
-    # MLP early-stopping settings used everywhere below. sklearn carves
-    # `validation_fraction` of each training fold for an internal
-    # validation set and stops training when val-loss hasn't improved for
-    # `n_iter_no_change` consecutive iterations — that's the actual
-    # protection against the overfitting users were seeing on small data,
-    # AND it shortens the typical fit time substantially.
+    # MLP early-stopping settings. The original (validation_fraction=0.1,
+    # n_iter_no_change=10) collapsed the 5-layer MLP to chance on small
+    # datasets: with ~400 training samples per fold the val set has only
+    # ~40 rows, val-loss is noisy, and patience runs out before the
+    # deeper net leaves initialisation. The settings below give the
+    # deeper net enough room to converge on small data while still
+    # shielding against overfitting on big data.
     _MLP_KW = dict(
         max_iter=500,
         early_stopping=True,
-        validation_fraction=0.1,
-        n_iter_no_change=10,
+        validation_fraction=0.15,
+        n_iter_no_change=25,
+        tol=1e-4,
         random_state=random_state,
     )
 
