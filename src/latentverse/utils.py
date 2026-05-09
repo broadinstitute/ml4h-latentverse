@@ -117,6 +117,77 @@ else:
         return 1.0 - (ss_res / ss_tot)
 
 
+def detect_task_type(labels, max_classes_for_classification=20):
+    """
+    Decide whether `labels` look like binary, multiclass, or regression.
+
+    Returns 'binary' | 'multiclass' | 'regression'. Used by probing and
+    expressiveness so they pick the right metric (AUROC / Accuracy+F1 / R²)
+    rather than the older "binary or regression" two-way fork that mis-typed
+    every multiclass label as a regression target.
+    """
+    labels = np.asarray(labels, dtype=np.float64).ravel()
+    finite = labels[~np.isnan(labels)]
+    if finite.size == 0:
+        return "regression"
+
+    unique_values = np.unique(finite)
+    n_unique = len(unique_values)
+    n_samples = finite.size
+
+    is_integer_like = np.allclose(unique_values, np.round(unique_values))
+    uniqueness_ratio = n_unique / n_samples
+
+    if n_unique == 2:
+        return "binary"
+    if (
+        n_unique <= max_classes_for_classification
+        and is_integer_like
+        and uniqueness_ratio < 0.05
+    ):
+        return "multiclass"
+    if n_unique <= max_classes_for_classification and uniqueness_ratio < 0.01:
+        return "multiclass"
+    return "regression"
+
+
+def random_baseline(labels, metric_type):
+    """
+    Closed-form expected score of a chance predictor for the given metric.
+
+    * AUROC (binary or multiclass macro-OvR): 0.5 by construction.
+    * Accuracy: majority-class frequency — what `predict-majority` achieves,
+      and the correct floor for imbalanced data.
+    * Macro-F1: empirical estimate from one label permutation; matches the
+      "shuffled labels" definition the frontend used to draw on the plot.
+    * R²: 0.0 — predicting the mean.
+
+    Returns float, or None if the metric isn't recognised.
+    """
+    metric_type = (metric_type or "").strip()
+    labels = np.asarray(labels).ravel()
+    finite_mask = ~pd.isna(labels)
+    finite = labels[finite_mask]
+    if finite.size == 0:
+        return None
+
+    if metric_type == "AUROC":
+        return 0.5
+    if metric_type == "Accuracy":
+        _, counts = np.unique(finite, return_counts=True)
+        return float(counts.max() / counts.sum())
+    if metric_type == "F1 (macro)":
+        rng = np.random.default_rng(0)
+        permuted = rng.permutation(finite)
+        try:
+            return float(f1_score(finite, permuted, average="macro"))
+        except Exception:
+            return None
+    if metric_type in ("R²", "R2"):
+        return 0.0
+    return None
+
+
 def load_data(representation_path, phenotype_labels, phenotype_path):
     latent_data = pd.read_csv(representation_path, sep="\t")
     phenotype_data = pd.read_csv(phenotype_path)
