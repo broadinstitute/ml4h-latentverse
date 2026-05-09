@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import entropy
-from ml4h_latentverse.utils import fit_logistic
+from latentverse.utils import fit_logistic
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler

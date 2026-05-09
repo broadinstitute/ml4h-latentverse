@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib
 
 matplotlib.use("Agg")
-from ml4h_latentverse.utils import fit_logistic, fit_linear
+from latentverse.utils import fit_logistic, fit_linear
 
 # QUICK WIN #3: Joblib parallelization (4-8x speedup on multi-core systems)
 try:
