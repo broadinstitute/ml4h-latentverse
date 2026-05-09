@@ -1,10 +1,41 @@
-# Ignore virtual environments
-venv/
-
-# Ignore compiled Python files
+# Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
 
-# Ignore setuptools metadata
+# Distribution / packaging
+build/
+dist/
 *.egg-info/
+*.egg
+*.whl
+*.tar.gz
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Notebooks
+.ipynb_checkpoints/
