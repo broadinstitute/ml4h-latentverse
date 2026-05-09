@@ -3,7 +3,7 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ml4h-latentverse"
+name = "latentverse"
 version = "0.3.0"
 description = "Latentverse evaluation suite + MultiLoReFT multimodal decoupling. Five core tests (clusterability, disentanglement, expressiveness, robustness, probing) over latent representations, plus a multimodal embedding decoupler."
 readme = "README.md"
@@ -33,16 +33,23 @@ dev = ["pytest", "ruff"]
 Homepage = "https://github.com/broadinstitute/ml4h-latentverse"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["ml4h_latentverse*"]
+where = ["src"]
+include = ["latentverse*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests", "examples"]
 
 # CI lint is intentionally minimal: catch real bugs (syntax errors, undefined
 # names, broken f-strings) but not stylistic warnings, so CI stays green while
-# the library evolves quickly. Run `ruff check ml4h_latentverse --select=ALL`
-# locally for a deeper review.
-[tool.ruff]
-line-length = 120
-
+# the library evolves quickly. Run `ruff check . --select=ALL` locally for
+# a deeper review.
 [tool.ruff.lint]
 select = [
     "E9",  # syntax errors
@@ -51,6 +58,10 @@ select = [
     "F82", # undefined names
 ]
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
 [tool.ruff.lint.per-file-ignores]
 # multimodal_projector.py contains a Flickr-style text-tokenization branch
 # (self.encoders is not None) that references `en_tokenizer` / `fr_tokenizer`
@@ -58,4 +69,4 @@ select = [
 # always passes pre-computed numeric embeddings, so self.encoders stays None
 # and those names are unreachable. Skip F821 to keep CI green without
 # deleting the upstream code path.
-"ml4h_latentverse/multiloreft/multimodal_projector.py" = ["F821"]
+"src/latentverse/multiloreft/multimodal_projector.py" = ["F821"]
