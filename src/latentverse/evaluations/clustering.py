@@ -44,6 +44,23 @@ def run_clustering(representations, labels, num_clusters=None, plots=False, rand
         representations = representations.to_numpy()
     representations = np.array(representations, dtype=np.float64)
 
+    # Reject degenerate inputs up front so callers get a clear, actionable
+    # message instead of silent None metrics from sklearn-internal failures.
+    # Silhouette needs `2 <= n_labels <= n_samples - 1`, so n_samples >= 3
+    # is the smallest input where every reported metric is well-defined.
+    n_rows = representations.shape[0]
+    if n_rows < 3:
+        raise ValueError(
+            f"clustering requires at least 3 samples, got {n_rows}."
+        )
+    col_variances = representations.var(axis=0)
+    if np.all(col_variances < 1e-12):
+        raise ValueError(
+            "clustering input has no variance: every column is constant "
+            "(all rows are identical). Provide representations where at "
+            "least one feature varies across samples."
+        )
+
     if labels is None:
         has_labels = False
         valid_label_mask = None
