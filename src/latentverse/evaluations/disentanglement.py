@@ -85,9 +85,15 @@ def run_disentanglement(representations, labels, random_state=42):
     labels = np.array(labels, dtype=np.float64).reshape(-1)
     representations = np.array(representations, dtype=np.float64)
 
-    min_samples = min(labels.shape[0], representations.shape[0])
-    labels = labels[:min_samples]
-    representations = representations[:min_samples, :]
+    # Reject mismatched shapes loudly. Silently truncating to the shorter
+    # array misaligns each row's reps with its factor and produces metrics
+    # on garbage. Surface a clear, actionable message instead.
+    if representations.shape[0] != labels.shape[0]:
+        raise ValueError(
+            "disentanglement: sample-count mismatch between representations "
+            f"({representations.shape[0]}) and labels ({labels.shape[0]}). "
+            "Both inputs must have the same number of rows."
+        )
 
     mask = ~np.isnan(labels)
     labels = labels[mask]
