@@ -64,6 +64,30 @@ def run_robustness(
     # FIX: Force conversion to numpy float64 array to handle PyArrow arrays
     representations = np.array(representations, dtype=np.float64)
 
+    # Drop rows with non-finite values up front. Without this the inner
+    # KMeans / probing call fails per noise level, the bare except swallows
+    # the error, and the aggregated metrics dict ends up missing keys
+    # entirely — which the SPA renders as a blank trace with no warning.
+    finite_mask = np.all(np.isfinite(representations), axis=1)
+    if not finite_mask.all():
+        n_dropped = int((~finite_mask).sum())
+        if not finite_mask.any():
+            raise ValueError(
+                "robustness: every representation row contains NaN or Inf. "
+                "Drop or impute non-finite values before running."
+            )
+        representations = representations[finite_mask]
+        if labels is not None:
+            labels = np.asarray(labels)
+            if labels.shape[0] >= finite_mask.shape[0]:
+                labels = labels[: finite_mask.shape[0]][finite_mask]
+        # Soft warning rather than raise — partial NaN is common in real data.
+        import logging
+        logging.getLogger(__name__).warning(
+            "robustness: dropped %d row(s) with non-finite representation values",
+            n_dropped,
+        )
+
     if metric == "clustering":
         if labels is not None:
             # Keep full representation rows for intrinsic metric comparability.
