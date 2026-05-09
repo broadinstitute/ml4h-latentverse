@@ -1,5 +1,5 @@
 """
-End-to-end CLI smoke for ml4h-latentverse.
+End-to-end CLI smoke for latentverse.
 
 Demonstrates how a researcher would use the library from a plain
 Python script (no FastAPI, no React, no GCP). Generates synthetic
@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-from ml4h_latentverse import (
+from latentverse import (
     run_clustering,
     run_disentanglement,
     run_expressiveness,
@@ -149,7 +149,7 @@ def demo_multimodal() -> None:
         print("    Skipped (torch not installed).")
         return
 
-    from ml4h_latentverse.multiloreft import MultiLoReFT
+    from latentverse.multiloreft import MultiLoReFT
 
     torch.manual_seed(0)
     input_dims = [16, 24]   # two modalities of different size
@@ -186,7 +186,7 @@ def demo_multimodal() -> None:
 # ---------------------------------------------------------------------------
 def main() -> int:
     t0 = time.time()
-    print("ml4h-latentverse CLI smoke")
+    print("latentverse CLI smoke")
     print("-" * 60)
 
     demos = [

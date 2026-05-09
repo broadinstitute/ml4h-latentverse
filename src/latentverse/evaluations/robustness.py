@@ -121,7 +121,7 @@ def run_robustness(
 
         try:
             if metric == "clustering":
-                from ml4h_latentverse.tests.clustering import run_clustering
+                from latentverse.evaluations.clustering import run_clustering
 
                 clustering_kwargs = {
                     "representations": noisy_representations,
@@ -132,7 +132,7 @@ def run_robustness(
                 res = run_clustering(**clustering_kwargs)
                 results = res.get("results", {})
             elif metric == "probing":
-                from ml4h_latentverse.tests.probing import run_probing_fast
+                from latentverse.evaluations.probing import run_probing_fast
 
                 # Use fast probing for robustness (2-fold, 2 models) to avoid excessive computation
                 # Full probing: 5 folds × 4 models = 20 fits per noise level
