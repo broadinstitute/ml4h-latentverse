@@ -113,12 +113,13 @@ def run_clustering(representations, labels, num_clusters=None, plots=False, rand
         """Compute Silhouette Score with automatic sampling for large datasets"""
         try:
             if len(representations) > 5000:
-                # For large datasets: sample 20% of points (or min 1000)
+                # For large datasets: sample 20% of points (or min 1000).
+                # Use a seeded RNG so silhouette is reproducible across runs.
                 sample_size = max(1000, len(representations) // 5)
-                sample_indices = np.random.choice(
+                sample_indices = np.random.default_rng(random_state).choice(
                     len(representations),
                     size=sample_size,
-                    replace=False
+                    replace=False,
                 )
 
                 # Compute silhouette on sample only
@@ -148,37 +149,43 @@ def run_clustering(representations, labels, num_clusters=None, plots=False, rand
             return None
 
     def compute_learnability():
-        """Compute Cluster Learnability via LogisticRegression on ground-truth labels"""
-        try:
-            if not has_labels:
-                logger.warning("Skipping Learnability: No ground-truth labels provided.")
-                return None
+        """Cluster Learnability: linear separability of KMeans cluster assignments.
 
+        Trains a logistic-regression probe to predict *KMeans cluster ID*
+        (not ground-truth labels) from the representation vectors.  A high
+        score means the geometry found by KMeans is cleanly linearly separable
+        in this subspace; a low score (≈ 1/k for k-class chance) means the
+        cluster boundaries are fuzzy.
+
+        This is an *intrinsic* metric — it reflects per-subspace geometry and
+        does not require ground-truth labels.  Previously the function was
+        predicting ground-truth labels, which caused the score to equal the
+        majority-class test-set accuracy (a label-prevalence artefact) and to
+        be identical across all three multimodal subspaces.
+        """
+        try:
             from sklearn.model_selection import train_test_split
 
-            representations_valid = representations[valid_label_mask]
+            unique_clusters = np.unique(cluster_labels)
+            if len(unique_clusters) < 2:
+                logger.warning("Skipping Learnability: only one cluster found.")
+                return None
+            if len(cluster_labels) < 10:
+                logger.warning("Skipping Learnability: too few samples.")
+                return None
 
-            # 1. Train/test split to measure generalization, not memorization
             X_train, X_test, y_train, y_test = train_test_split(
-                representations_valid,
-                labels_valid,
+                representations,
+                cluster_labels,          # intrinsic KMeans target, per-subspace
                 test_size=0.2,
                 random_state=random_state,
-                stratify=labels_valid,
+                stratify=cluster_labels,
             )
 
-            # 2. Initialize the Probe (Linear complexity as per Latentverse standard)
             clf = LogisticRegression(max_iter=1000, random_state=random_state)
-            
-            # 3. Fit on Ground Truth labels (extrinsic), NOT K-Means (intrinsic)
             clf.fit(X_train, y_train)
+            return clf.score(X_test, y_test)
 
-            # 4. Calculate Score on held-out test set
-            accuracy = clf.score(X_test, y_test)
-
-            # 5. Return as 0-1 scale
-            return accuracy 
-            
         except Exception as e:
             logger.warning(f"Learnability computation failed: {e}")
             return None
