@@ -18,9 +18,6 @@ correlated modalities apart in latent space; it's useful when you want
 "image-only" and "text-only" embeddings out of a model that learned them
 jointly.
 
-There's also a companion webapp at https://latentverse-web-783282864357.us-central1.run.app/ that
-puts a UI in front of all of this; the library itself has no webapp
-dependencies.
 
 ## Install
 
