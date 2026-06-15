@@ -82,8 +82,22 @@ def run_disentanglement(representations, labels, random_state=42):
     results = {}
 
     # FIX: Force conversion to numpy float64 arrays to handle PyArrow arrays
-    labels = np.array(labels, dtype=np.float64).reshape(-1)
     representations = np.array(representations, dtype=np.float64)
+    labels = np.asarray(labels)
+
+    # Multi-factor support. DCI Disentanglement/Completeness are only
+    # meaningful with >= 2 generative factors (Disentanglement = "does each
+    # latent dim capture at most ONE factor", Completeness = "is each factor
+    # captured by FEW dims"). With a single 1-D factor the scores below
+    # degenerate (~0 on a representation that spreads one factor across many
+    # dims). When given a 2-D (N, F) factor matrix we compute the full
+    # Eastwood & Williams DCI across factors; a 1-D vector keeps the original
+    # single-factor behaviour for backward compatibility.
+    if labels.ndim == 2 and labels.shape[1] > 1:
+        return _run_multifactor_disentanglement(
+            representations, labels, random_state=random_state
+        )
+    labels = labels.astype(np.float64).reshape(-1)
 
     # Reject mismatched shapes loudly. Silently truncating to the shorter
     # array misaligns each row's reps with its factor and produces metrics
@@ -149,6 +163,129 @@ def run_disentanglement(representations, labels, random_state=42):
         "y_label": "Generative Factors (Ground Truth Labels)",
     }
 
+    return {"metrics": results, "plot_data": plot_data}
+
+
+def _factor_importance_matrix(representations, factors, random_state=42):
+    """Importance matrix I of shape (D, F): MI between each latent dim and each
+    generative factor. Continuous factors use MI-regression, discrete use
+    MI-classification (per factor)."""
+    n_dims = representations.shape[1]
+    n_factors = factors.shape[1]
+    I = np.zeros((n_dims, n_factors), dtype=np.float64)
+    for f in range(n_factors):
+        col = np.asarray(factors[:, f], dtype=np.float64)
+        mask = ~np.isnan(col)
+        y = col[mask]
+        X = representations[mask, :]
+        if y.shape[0] < 3 or len(np.unique(y)) < 2:
+            continue  # factor carries no usable signal -> zero column
+        if len(np.unique(y)) > 2:
+            I[:, f] = mutual_info_regression(
+                X, y, n_neighbors=3, random_state=random_state
+            )
+        else:
+            I[:, f] = mutual_info_classif(
+                X, y.astype(int), n_neighbors=3, random_state=random_state
+            )
+    return I
+
+
+def _entropy_normalized(P, axis, n):
+    """Row/column-wise Shannon entropy normalized to [0, 1] by log(n)."""
+    eps = 1e-12
+    with np.errstate(divide="ignore", invalid="ignore"):
+        terms = np.where(P > eps, P * np.log(P + eps), 0.0)
+    H = -np.sum(terms, axis=axis)
+    return H / np.log(n) if n > 1 else np.zeros_like(H)
+
+
+def dci_disentanglement_multifactor(I):
+    """DCI Disentanglement for an (D, F) importance matrix: per-dim entropy
+    ACROSS factors, weighted by each dim's total relevance."""
+    eps = 1e-12
+    n_factors = I.shape[1]
+    row_sums = I.sum(axis=1, keepdims=True)
+    P = I / (row_sums + eps)  # per-dim distribution over factors
+    D_per_dim = 1.0 - _entropy_normalized(P, axis=1, n=n_factors)
+    rho = row_sums.flatten() / (I.sum() + eps)  # dim relevance weights
+    return float(np.clip(np.sum(rho * D_per_dim), 0.0, 1.0))
+
+
+def dci_completeness_multifactor(I):
+    """DCI Completeness for an (D, F) importance matrix: per-factor entropy
+    ACROSS dimensions, averaged over factors."""
+    eps = 1e-12
+    n_dims = I.shape[0]
+    col_sums = I.sum(axis=0, keepdims=True)
+    P = I / (col_sums + eps)  # per-factor distribution over dims
+    C_per_factor = 1.0 - _entropy_normalized(P, axis=0, n=n_dims)
+    # Weight each factor's completeness by how informative it is overall so a
+    # signal-less factor column doesn't drag the score.
+    weights = col_sums.flatten()
+    if weights.sum() < eps:
+        return 0.0
+    return float(np.clip(np.average(C_per_factor, weights=weights), 0.0, 1.0))
+
+
+def _run_multifactor_disentanglement(representations, factors, random_state=42):
+    """Full Eastwood & Williams DCI plus MIG/SAP/TC for a (N, F) factor matrix.
+
+    Disentanglement and Completeness are computed across factors (the
+    standard definition); Informativeness, MIG and SAP are averaged over
+    factors; Total Correlation is a property of the representation alone.
+    """
+    representations = np.asarray(representations, dtype=np.float64)
+    factors = np.asarray(factors, dtype=np.float64)
+    if representations.shape[0] != factors.shape[0]:
+        raise ValueError(
+            "disentanglement: sample-count mismatch between representations "
+            f"({representations.shape[0]}) and factors ({factors.shape[0]}). "
+            "Both inputs must have the same number of rows."
+        )
+
+    I = _factor_importance_matrix(representations, factors, random_state=random_state)
+
+    disentanglement = dci_disentanglement_multifactor(I)
+    completeness = dci_completeness_multifactor(I)
+
+    # Per-factor informativeness / MIG / SAP, averaged.
+    info_scores, mig_scores, sap_scores = [], [], []
+    n_factors = factors.shape[1]
+    for f in range(n_factors):
+        col = factors[:, f]
+        mask = ~np.isnan(col)
+        y = col[mask]
+        X = representations[mask, :]
+        if y.shape[0] < 3 or len(np.unique(y)) < 2:
+            continue
+        is_cont = len(np.unique(y)) > 2
+        info_scores.append(
+            compute_informativeness_score(X, y, is_cont, random_state=random_state)
+        )
+        mig_scores.append(compute_mig(I[:, f : f + 1], y))
+        sap_scores.append(compute_sap_score(X, y, is_cont, random_state=random_state))
+
+    informativeness = float(np.mean(info_scores)) if info_scores else 0.0
+
+    results = {
+        "DCI": {
+            "Disentanglement": max(0.0, disentanglement),
+            "Completeness": max(0.0, completeness),
+            "Informativeness": max(0.0, min(informativeness, 1.0)),
+        },
+        "MIG": float(np.mean(mig_scores)) if mig_scores else 0.0,
+        "TC": compute_total_correlation_fast(representations),
+        "SAP": float(np.mean(sap_scores)) if sap_scores else 0.0,
+    }
+
+    plot_data = {
+        "x": [f"Dimension {i}" for i in range(representations.shape[1])],
+        "y": [f"Factor {j}" for j in range(n_factors)],
+        "z": I.T.tolist(),  # (F, D): one row per factor
+        "x_label": "Latent Dimensions (Representation Features)",
+        "y_label": "Generative Factors (Ground Truth Labels)",
+    }
     return {"metrics": results, "plot_data": plot_data}
 
 
