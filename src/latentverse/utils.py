@@ -15,6 +15,8 @@ except ImportError:
         "Warning: scikit-learn-intelex not installed. Install with: pip install scikit-learn-intelex"
     )
 
+import os
+
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression, Ridge
@@ -115,6 +117,40 @@ else:
         if ss_tot < 1e-10:
             return 0.0
         return 1.0 - (ss_res / ss_tot)
+
+
+def get_n_jobs(default=2):
+    """
+    Bounded worker count for the library's internal parallelism.
+
+    Reads ``LATENTVERSE_N_JOBS`` from the environment *at call time* so a host
+    can cap fan-out without editing code. It defaults to a small number rather
+    than joblib's ``-1`` ("use every core") on purpose: the web app already
+    runs up to ``cpu_count`` label columns concurrently, and if each of those
+    then grabbed every core the Cloud Run instance would oversubscribe its CPU
+    and BLAS thread pools and thrash. A small inner bound × the outer
+    label-level cap keeps total concurrency sane.
+
+    (Note this bounds joblib workers only, not the BLAS threads each fit may
+    spawn; ``OMP_NUM_THREADS`` / ``OPENBLAS_NUM_THREADS`` remain the knob for
+    that second layer.)
+
+    Semantics:
+      * unset / unparseable  -> ``default`` (2)
+      * ``-1``               -> pass through (all cores; explicit opt-in)
+      * positive int         -> that many workers
+      * ``0`` or ``< -1``    -> ``default`` (nonsensical, ignored)
+    """
+    raw = os.getenv("LATENTVERSE_N_JOBS")
+    if raw is None:
+        return default
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        return default
+    if val == -1 or val >= 1:
+        return val
+    return default
 
 
 def detect_task_type(labels, max_classes_for_classification=20):

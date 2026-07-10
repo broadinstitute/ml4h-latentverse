@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import roc_auc_score, accuracy_score, r2_score
 import warnings
 
-from latentverse.utils import detect_task_type, random_baseline
+from latentverse.utils import detect_task_type, random_baseline, get_n_jobs
 
 
 def run_probing(representations, labels, n_folds=3, random_state=42):
@@ -131,6 +131,11 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
         cv = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
         metrics = {"Model Complexity": [], "R²": [], "R²_std": []}
 
+    # Bound CV fan-out. Under the web app, up to cpu_count label columns run
+    # concurrently and each lands here; -1 ("all cores") per column would
+    # oversubscribe the instance. See latentverse.utils.get_n_jobs.
+    n_jobs = get_n_jobs()
+
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
         warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -144,7 +149,7 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
                 try:
                     auroc_scores = cross_val_score(
                         clone(model), representations, labels,
-                        cv=cv, scoring="roc_auc", n_jobs=-1
+                        cv=cv, scoring="roc_auc", n_jobs=n_jobs
                     )
                     metrics["AUROC"].append(np.mean(auroc_scores))
                     metrics["AUROC_std"].append(np.std(auroc_scores))
@@ -156,7 +161,7 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
                 try:
                     acc_scores = cross_val_score(
                         clone(model), representations, labels,
-                        cv=cv, scoring="accuracy", n_jobs=-1
+                        cv=cv, scoring="accuracy", n_jobs=n_jobs
                     )
                     metrics["Accuracy"].append(np.mean(acc_scores))
                     metrics["Accuracy_std"].append(np.std(acc_scores))
@@ -169,7 +174,7 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
                 try:
                     acc_scores = cross_val_score(
                         clone(model), representations, labels,
-                        cv=cv, scoring="accuracy", n_jobs=-1
+                        cv=cv, scoring="accuracy", n_jobs=n_jobs
                     )
                     metrics["Accuracy"].append(np.mean(acc_scores))
                     metrics["Accuracy_std"].append(np.std(acc_scores))
@@ -181,7 +186,7 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
                 try:
                     f1_scores = cross_val_score(
                         clone(model), representations, labels,
-                        cv=cv, scoring="f1_macro", n_jobs=-1
+                        cv=cv, scoring="f1_macro", n_jobs=n_jobs
                     )
                     metrics["F1 (macro)"].append(np.mean(f1_scores))
                     metrics["F1 (macro)_std"].append(np.std(f1_scores))
@@ -194,7 +199,7 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
                 try:
                     r2_scores = cross_val_score(
                         clone(model), representations, labels,
-                        cv=cv, scoring="r2", n_jobs=-1
+                        cv=cv, scoring="r2", n_jobs=n_jobs
                     )
                     metrics["R²"].append(np.mean(r2_scores))
                     metrics["R²_std"].append(np.std(r2_scores))

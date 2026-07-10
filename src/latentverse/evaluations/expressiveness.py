@@ -9,6 +9,7 @@ from latentverse.utils import (
     detect_task_type,
     fit_linear,
     fit_logistic,
+    get_n_jobs,
     random_baseline,
 )
 
@@ -97,6 +98,10 @@ def run_expressiveness(
     if labels.ndim == 1:
         labels = labels.reshape(-1, 1)
 
+    # Bound fold fan-out (see latentverse.utils.get_n_jobs): the web app runs
+    # many label columns concurrently, so -1 per column oversubscribes cores.
+    n_jobs = get_n_jobs()
+
     label_names = [f"Label {i + 1}" for i in range(labels.shape[1])]
     label_scores = {
         label: {percent: [] for percent in percent_to_remove_list}
@@ -153,7 +158,7 @@ def run_expressiveness(
                 return score_fn(X_train, X_test, y_train, y_test, verbose)
 
             if HAS_JOBLIB and folds > 1:
-                fold_results = Parallel(n_jobs=-1, backend="threading")(
+                fold_results = Parallel(n_jobs=n_jobs, backend="threading")(
                     delayed(process_fold)(fold_idx) for fold_idx in range(folds)
                 )
                 label_scores[label_name][percent_to_remove].extend(fold_results)

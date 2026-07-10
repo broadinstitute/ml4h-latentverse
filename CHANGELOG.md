@@ -35,6 +35,32 @@ and the project aims for [Semantic Versioning](https://semver.org/).
   package's own evaluations submodule.
 - GitHub Actions CI added: ruff lint + pytest on push and PR.
 
+## [0.3.1] - 2026-07
+
+Scale-hardening follow-up: bound the evaluations' internal parallelism and
+cap robustness peak memory so many-label web-app runs don't oversubscribe a
+Cloud Run instance.
+
+### Changed (non-breaking)
+
+- **Bounded internal parallelism.** The probing, expressiveness, and
+  robustness evaluations no longer hard-code joblib `n_jobs=-1` ("grab every
+  core"). They now read `LATENTVERSE_N_JOBS` (default `2`) via the new
+  `latentverse.utils.get_n_jobs` helper. This prevents CPU/BLAS thread
+  oversubscription when a host (e.g. the web app) runs many label columns
+  concurrently and each column's evaluation would otherwise fan out across
+  all cores. Set `LATENTVERSE_N_JOBS=-1` to restore the old all-cores
+  behaviour. Bounding joblib workers does not cap the BLAS threads each fit
+  spawns — use `OMP_NUM_THREADS` for that second layer.
+- **Robustness streams noise one level at a time.** `run_robustness` used to
+  pre-allocate a noise matrix for *every* noise level up front
+  (`len(noise_levels) × N × D × 8` bytes resident before any work). It now
+  generates each level's noise inside the worker from an independent,
+  deterministically-seeded RNG (`default_rng([random_state, index])`), so
+  peak memory is bounded by the worker count and results stay reproducible
+  and thread-safe. Absolute noise values differ from 0.3.0 (new per-level
+  RNG); metric *shapes* are unchanged.
+
 ## [0.3.0] - 2025-04
 
 - MultiLoReFT multimodal decoupling module integrated.

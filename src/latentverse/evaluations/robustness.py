@@ -4,6 +4,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+from latentverse.utils import get_n_jobs
+
 # QUICK WIN: Joblib parallelization for noise levels
 try:
     from joblib import Parallel, delayed
@@ -43,8 +45,8 @@ def run_robustness(
     clustering or probing performance.
 
     PHASE 1 IMPROVEMENTS:
-    - Parallel processing of noise levels (4-8x speedup)
-    - Pre-generated noise matrices (faster than on-the-fly generation)
+    - Parallel processing of noise levels (bounded via LATENTVERSE_N_JOBS)
+    - Noise matrices streamed one level at a time to cap peak memory
     - Single preprocessing pass
 
     Parameters:
@@ -126,16 +128,18 @@ def run_robustness(
         if not labels_available:
             raise ValueError("No valid labels available for robustness probing mode.")
 
-    # OPTIMIZATION: Pre-generate all noise matrices (faster than generating on-the-fly)
-    np.random.seed(random_state)  # Reproducible results
-    noise_matrices = [
-        noise_level * np.random.normal(size=representations.shape)
-        for noise_level in noise_levels
-    ]
-
-    # OPTIMIZATION: Parallelize noise level testing (4-8x speedup)
-    def process_noise_level(noise_level, noise_matrix):
-        """Process single noise level"""
+    # Stream noise one level at a time instead of pre-allocating every matrix.
+    # Each level draws from its own independent, deterministically-seeded RNG
+    # (default_rng([random_state, index])), which keeps results reproducible
+    # AND thread-safe under the threading backend — the old code seeded the
+    # global np.random once and shared it, which races across threads. Peak
+    # memory is now bounded by the number of concurrent workers rather than
+    # len(noise_levels): at N=11230, D=1024, float64 each matrix is ~92 MB, so
+    # pre-allocating every level held them all resident before any work began.
+    def process_noise_level(index, noise_level):
+        """Generate this level's noise, apply it, and score it. One matrix alive."""
+        rng = np.random.default_rng([random_state, index])
+        noise_matrix = noise_level * rng.standard_normal(size=representations.shape)
         noisy_representations = representations + noise_matrix
         results = {}
 
@@ -170,18 +174,20 @@ def run_robustness(
 
     # Run sequentially for probing to avoid nested parallelism issues
     # (probing internally uses parallel CV which conflicts with outer parallel)
-    # Clustering is fast enough to parallelize
+    # Clustering is fast enough to parallelize. Bound the worker count so we
+    # don't oversubscribe cores when the web app runs many label columns at
+    # once (see latentverse.utils.get_n_jobs); this also caps how many noise
+    # matrices are alive at once to n_jobs rather than len(noise_levels).
     if HAS_JOBLIB and len(noise_levels) > 1 and metric == "clustering":
-        # Parallel execution for clustering (4-8x speedup on multi-core)
-        parallel_results = Parallel(n_jobs=-1, backend="threading")(
-            delayed(process_noise_level)(noise_level, noise_matrix)
-            for noise_level, noise_matrix in zip(noise_levels, noise_matrices)
+        parallel_results = Parallel(n_jobs=get_n_jobs(), backend="threading")(
+            delayed(process_noise_level)(index, noise_level)
+            for index, noise_level in enumerate(noise_levels)
         )
     else:
         # Sequential for probing (avoids nested parallelism) or fallback
         parallel_results = [
-            process_noise_level(noise_level, noise_matrix)
-            for noise_level, noise_matrix in zip(noise_levels, noise_matrices)
+            process_noise_level(index, noise_level)
+            for index, noise_level in enumerate(noise_levels)
         ]
 
     # Organize results
