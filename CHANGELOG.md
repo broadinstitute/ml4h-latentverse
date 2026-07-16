@@ -35,6 +35,48 @@ and the project aims for [Semantic Versioning](https://semver.org/).
   package's own evaluations submodule.
 - GitHub Actions CI added: ruff lint + pytest on push and PR.
 
+## [0.3.2] - 2026-07
+
+Correctness fix for categorical disentanglement factors + a loss-free probing
+speedup.
+
+### Fixed
+
+- **Disentanglement now picks its estimator family by task type, not by a raw
+  "&gt;2 distinct values" test.** `run_disentanglement` used
+  `is_continuous = len(np.unique(labels)) > 2`, so a nominal multiclass factor
+  (e.g. a 4-class label a host encoded as 0/1/2/3) was fed to the *regression*
+  estimators (`mutual_info_regression`, per-dim `LinearRegression` R² for SAP,
+  `MLPRegressor` pseudo-R² for Informativeness). That imposes an arbitrary
+  ordinal spacing on the class codes, making DCI-Informativeness and SAP depend
+  on the meaningless encoding order (empirically ±0.23 for Informativeness under
+  a relabel of the same 4 classes). It now uses
+  `detect_task_type(labels) == "regression"` — the same detector probing and
+  expressiveness already use — so binary/multiclass factors route to the
+  classification estimators (`mutual_info_classif`, classifier-accuracy SAP,
+  classifier Informativeness), matching the DCI/MIG/SAP definitions. Binary and
+  genuinely-continuous factors are unaffected. Categorical-factor DCI-Disentanglement/
+  Completeness/MIG remain near-0 on a single factor — that is single-factor
+  structural degeneracy, not the estimator.
+- **Multiclass Informativeness no longer crashes.** The classification branch of
+  `compute_informativeness_score` called the binary-only `fit_logistic`
+  (`predict_proba[:, 1]` + binary `roc_auc`), which raised on &gt;2 classes. It
+  now uses a matched-capacity `MLPClassifier` + macro one-vs-rest AUROC for
+  multiclass (reduces to standard AUROC at 2 classes; accuracy fallback when a
+  rare class is absent from the test split). Binary keeps the established
+  `fit_logistic` path unchanged.
+
+### Changed (non-breaking)
+
+- **Probing scores every metric in one CV pass per model.** `run_probing`
+  issued a separate `cross_val_score` per scorer (binary: `roc_auc`+`accuracy`;
+  multiclass: `accuracy`+`f1_macro`), and each call refit all models on all
+  folds — training every model twice on those paths. It now uses a single
+  `cross_validate(scoring=[...])`, which scores all metrics on the same fitted
+  folds. Results are **byte-identical** (same splitter + seed ⇒ identical folds
+  and fits); measured ~2× faster on the 2-scorer paths (regression, single
+  scorer, is unchanged).
+
 ## [0.3.1] - 2026-07
 
 Scale-hardening follow-up: bound the evaluations' internal parallelism and

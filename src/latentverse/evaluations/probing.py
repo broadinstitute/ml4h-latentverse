@@ -1,7 +1,12 @@
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge, LogisticRegression
-from sklearn.model_selection import cross_val_score, StratifiedKFold, KFold, train_test_split
+from sklearn.model_selection import (
+    cross_validate,
+    StratifiedKFold,
+    KFold,
+    train_test_split,
+)
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.base import clone
 from sklearn.preprocessing import LabelEncoder
@@ -136,6 +141,26 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
     # oversubscribe the instance. See latentverse.utils.get_n_jobs.
     n_jobs = get_n_jobs()
 
+    # Score every metric in ONE cross-validation pass per model. The previous
+    # code issued a separate cross_val_score per scorer (e.g. accuracy AND
+    # f1_macro for multiclass), and each call refit all models on all folds —
+    # so every model on the 2-scorer paths (binary: roc_auc+accuracy,
+    # multiclass: accuracy+f1_macro) was trained twice. cross_validate scores
+    # all listed metrics on the SAME fitted folds, halving the fits on those
+    # paths. Results are byte-identical: same StratifiedKFold/KFold splitter and
+    # random_state ⇒ identical fold assignments and identical fits, and mean/std
+    # are computed over the same per-fold arrays. (Regression has a single
+    # scorer, so this is a no-op there.)
+    if is_classification and is_binary:
+        scoring = ["roc_auc", "accuracy"]
+        score_to_key = {"roc_auc": "AUROC", "accuracy": "Accuracy"}
+    elif is_classification:
+        scoring = ["accuracy", "f1_macro"]
+        score_to_key = {"accuracy": "Accuracy", "f1_macro": "F1 (macro)"}
+    else:
+        scoring = ["r2"]
+        score_to_key = {"r2": "R²"}
+
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
         warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -145,68 +170,23 @@ def run_probing(representations, labels, n_folds=3, random_state=42):
             print(f" Evaluating {model_name}...")
             metrics["Model Complexity"].append(model_name)
 
-            if is_classification and is_binary:
-                try:
-                    auroc_scores = cross_val_score(
-                        clone(model), representations, labels,
-                        cv=cv, scoring="roc_auc", n_jobs=n_jobs
-                    )
-                    metrics["AUROC"].append(np.mean(auroc_scores))
-                    metrics["AUROC_std"].append(np.std(auroc_scores))
-                except Exception as e:
-                    print(f" AUROC failed: {e}")
-                    metrics["AUROC"].append(None)
-                    metrics["AUROC_std"].append(None)
-
-                try:
-                    acc_scores = cross_val_score(
-                        clone(model), representations, labels,
-                        cv=cv, scoring="accuracy", n_jobs=n_jobs
-                    )
-                    metrics["Accuracy"].append(np.mean(acc_scores))
-                    metrics["Accuracy_std"].append(np.std(acc_scores))
-                except Exception as e:
-                    print(f" Accuracy failed: {e}")
-                    metrics["Accuracy"].append(None)
-                    metrics["Accuracy_std"].append(None)
-
-            elif is_classification and not is_binary:
-                try:
-                    acc_scores = cross_val_score(
-                        clone(model), representations, labels,
-                        cv=cv, scoring="accuracy", n_jobs=n_jobs
-                    )
-                    metrics["Accuracy"].append(np.mean(acc_scores))
-                    metrics["Accuracy_std"].append(np.std(acc_scores))
-                except Exception as e:
-                    print(f" Accuracy failed: {e}")
-                    metrics["Accuracy"].append(None)
-                    metrics["Accuracy_std"].append(None)
-
-                try:
-                    f1_scores = cross_val_score(
-                        clone(model), representations, labels,
-                        cv=cv, scoring="f1_macro", n_jobs=n_jobs
-                    )
-                    metrics["F1 (macro)"].append(np.mean(f1_scores))
-                    metrics["F1 (macro)_std"].append(np.std(f1_scores))
-                except Exception as e:
-                    print(f" F1 failed: {e}")
-                    metrics["F1 (macro)"].append(None)
-                    metrics["F1 (macro)_std"].append(None)
-
-            else:
-                try:
-                    r2_scores = cross_val_score(
-                        clone(model), representations, labels,
-                        cv=cv, scoring="r2", n_jobs=n_jobs
-                    )
-                    metrics["R²"].append(np.mean(r2_scores))
-                    metrics["R²_std"].append(np.std(r2_scores))
-                except Exception as e:
-                    print(f" R² failed: {e}")
-                    metrics["R²"].append(None)
-                    metrics["R²_std"].append(None)
+            try:
+                cv_results = cross_validate(
+                    clone(model), representations, labels,
+                    cv=cv, scoring=scoring, n_jobs=n_jobs,
+                )
+                for scorer, key in score_to_key.items():
+                    fold_scores = cv_results[f"test_{scorer}"]
+                    metrics[key].append(np.mean(fold_scores))
+                    metrics[f"{key}_std"].append(np.std(fold_scores))
+            except Exception as e:
+                # Keep the metrics dict rectangular: one value per model for
+                # every key on this path so downstream trace-building never
+                # misaligns rows.
+                print(f" {model_name} CV failed: {e}")
+                for key in score_to_key.values():
+                    metrics[key].append(None)
+                    metrics[f"{key}_std"].append(None)
 
     # Random baselines per metric — fed to the SPA so it can draw a chance
     # reference line that's correct under class imbalance.

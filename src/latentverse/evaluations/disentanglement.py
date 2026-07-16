@@ -1,13 +1,13 @@
 import numpy as np
 from scipy.stats import entropy
-from latentverse.utils import fit_logistic
+from latentverse.utils import fit_logistic, detect_task_type
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.neural_network import MLPRegressor
+from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.metrics import r2_score, accuracy_score
+from sklearn.metrics import r2_score, accuracy_score, roc_auc_score
 
 # QUICK WIN: Numba-accelerated entropy and disentanglement calculations
 try:
@@ -113,7 +113,18 @@ def run_disentanglement(representations, labels, random_state=42):
     labels = labels[mask]
     representations = representations[mask, :]
 
-    is_continuous = len(np.unique(labels)) > 2
+    # Pick the estimator family from the factor's TASK TYPE, not a raw
+    # "more than two distinct values" test. A nominal multiclass factor (e.g.
+    # a 4-class cellular location the host encoded as 0/1/2/3) has >2 unique
+    # values but is NOT continuous; feeding it to the regression estimators
+    # below imposes an arbitrary ordinal spacing on the class codes, so the
+    # resulting DCI-Informativeness / SAP depend on the (meaningless) encoding
+    # order. detect_task_type — already used by probing/expressiveness —
+    # classifies binary/multiclass as discrete and only a genuinely continuous
+    # target as "regression", so a discrete factor correctly routes to the
+    # classification estimators (mutual_info_classif, classifier-accuracy SAP,
+    # classifier informativeness), matching the DCI/MIG/SAP definitions.
+    is_continuous = detect_task_type(labels) == "regression"
 
     # OPTIMIZATION: Vectorized mutual information (10-50x faster than loop!)
     # sklearn computes MI for ALL features at once - no need for loop!
@@ -126,7 +137,10 @@ def run_disentanglement(representations, labels, random_state=42):
         )
     else:
         I_scores = mutual_info_classif(
-            representations, labels, n_neighbors=3, random_state=random_state
+            representations,
+            labels.astype(int),
+            n_neighbors=3,
+            random_state=random_state,
         )
 
     I_matrix = I_scores.reshape(-1, 1)
@@ -412,8 +426,34 @@ def compute_informativeness_score(representations, labels, is_continuous, random
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test)
         informativeness = 1 - (np.mean((y_test - y_pred) ** 2) / np.var(y_test))
-    else:
+    elif len(np.unique(labels)) <= 2:
+        # Binary: keep the established linear elastic-net probe (AUROC) so
+        # existing binary-label scores are unchanged.
         metrics = fit_logistic(X_train, X_test, y_train, y_test)
         informativeness = metrics["AUROC"]
+    else:
+        # Multiclass: fit_logistic is binary-only (predict_proba[:, 1] + binary
+        # roc_auc) and raises on >2 classes, so a discrete multiclass factor
+        # would crash here once routed to the classification path. Use a
+        # matched-capacity classifier (same architecture as the regression
+        # branch's MLP) and macro one-vs-rest AUROC — which reduces to standard
+        # AUROC at 2 classes and stays a bounded [0, 1] informativeness for any
+        # number of classes. Fall back to accuracy if a rare class is absent
+        # from the test split (macro-OvR AUROC is then undefined).
+        clf = make_pipeline(
+            StandardScaler(),
+            MLPClassifier(
+                hidden_layer_sizes=(64, 32, 16), max_iter=1000, random_state=random_state
+            ),
+        )
+        clf.fit(X_train, y_train.astype(int))
+        try:
+            proba = clf.predict_proba(X_test)
+            informativeness = roc_auc_score(
+                y_test.astype(int), proba,
+                multi_class="ovr", average="macro", labels=clf.classes_,
+            )
+        except ValueError:
+            informativeness = clf.score(X_test, y_test.astype(int))
 
     return informativeness
