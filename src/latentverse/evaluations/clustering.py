@@ -149,42 +149,63 @@ def run_clustering(representations, labels, num_clusters=None, plots=False, rand
             return None
 
     def compute_learnability():
-        """Cluster Learnability: linear separability of KMeans cluster assignments.
+        """Cluster Learnability: balanced accuracy of a label-recovery probe.
 
-        Trains a logistic-regression probe to predict *KMeans cluster ID*
-        (not ground-truth labels) from the representation vectors.  A high
-        score means the geometry found by KMeans is cleanly linearly separable
-        in this subspace; a low score (≈ 1/k for k-class chance) means the
-        cluster boundaries are fuzzy.
+        Trains a logistic-regression probe (stratified 80/20 split,
+        class_weight="balanced") to predict the GROUND-TRUTH labels from the
+        representation vectors, and reports BALANCED accuracy on the held-out
+        20%. This is the label-aware definition the LatentVerse paper commits
+        to (Appendix C): "the balanced accuracy of a logistic-regression probe
+        trained on a stratified 80/20 split, which measures how easily class
+        labels can be recovered."
 
-        This is an *intrinsic* metric — it reflects per-subspace geometry and
-        does not require ground-truth labels.  Previously the function was
-        predicting ground-truth labels, which caused the score to equal the
-        majority-class test-set accuracy (a label-prevalence artefact) and to
-        be identical across all three multimodal subspaces.
+        Fixed points (verified): ~1/k on structureless input with random
+        labels; ~1/k on no-signal input regardless of class imbalance (balanced
+        accuracy removes the majority-class prevalence artefact that plain
+        accuracy suffers from); ~1.0 on well-separated class structure.
+
+        History: an earlier revision predicted ground-truth labels with PLAIN
+        accuracy, which collapses to the majority-class rate on imbalanced
+        data. A later revision (0.3.1-0.3.2) switched the target to the KMeans
+        cluster ids, but a KMeans partition is linearly separable by
+        construction, so that variant scored ~1.0 even on pure noise and could
+        not detect structure. Balanced accuracy on ground-truth labels fixes
+        the prevalence artefact while keeping the metric label-aware and
+        discriminative.
+
+        Returns None when labels are absent (label-free runs rely on the
+        intrinsic metrics), when fewer than 2 classes are present, or when
+        there are fewer than 20 labeled samples.
         """
         try:
+            if not has_labels:
+                logger.warning("Skipping Learnability: no ground-truth labels provided.")
+                return None
+
+            from sklearn.metrics import balanced_accuracy_score
             from sklearn.model_selection import train_test_split
 
-            unique_clusters = np.unique(cluster_labels)
-            if len(unique_clusters) < 2:
-                logger.warning("Skipping Learnability: only one cluster found.")
+            representations_valid = representations[valid_label_mask]
+            if len(np.unique(labels_valid)) < 2:
+                logger.warning("Skipping Learnability: fewer than 2 classes in labels.")
                 return None
-            if len(cluster_labels) < 10:
-                logger.warning("Skipping Learnability: too few samples.")
+            if len(labels_valid) < 20:
+                logger.warning("Skipping Learnability: too few labeled samples.")
                 return None
 
             X_train, X_test, y_train, y_test = train_test_split(
-                representations,
-                cluster_labels,          # intrinsic KMeans target, per-subspace
+                representations_valid,
+                labels_valid,            # ground-truth target (label-aware)
                 test_size=0.2,
                 random_state=random_state,
-                stratify=cluster_labels,
+                stratify=labels_valid,
             )
 
-            clf = LogisticRegression(max_iter=1000, random_state=random_state)
+            clf = LogisticRegression(
+                max_iter=1000, random_state=random_state, class_weight="balanced"
+            )
             clf.fit(X_train, y_train)
-            return clf.score(X_test, y_test)
+            return balanced_accuracy_score(y_test, clf.predict(X_test))
 
         except Exception as e:
             logger.warning(f"Learnability computation failed: {e}")
