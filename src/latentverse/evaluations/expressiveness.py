@@ -24,21 +24,23 @@ except ImportError:
 
 
 # Map task type -> (metric name, primary-score key, fit-and-score callable).
-# The fit callable returns the scalar score for that fold.
-def _binary_score(X_train, X_test, y_train, y_test, verbose=False):
-    return fit_logistic(X_train, X_test, y_train, y_test, verbose)["AUROC"]
+# The fit callable returns the scalar score for that fold. `rng` is the fold's
+# private RandomState: the binary path's SAGA solver is stochastic, so it must
+# draw from the fold-local stream, never the (shared, racy) global numpy RNG.
+def _binary_score(X_train, X_test, y_train, y_test, verbose=False, rng=None):
+    return fit_logistic(X_train, X_test, y_train, y_test, verbose, random_state=rng)["AUROC"]
 
 
-def _regression_score(X_train, X_test, y_train, y_test, verbose=False):
+def _regression_score(X_train, X_test, y_train, y_test, verbose=False, rng=None):
     return fit_linear(X_train, X_test, y_train, y_test, verbose)["R²"]
 
 
-def _multiclass_score(X_train, X_test, y_train, y_test, verbose=False):
+def _multiclass_score(X_train, X_test, y_train, y_test, verbose=False, rng=None):
     # Multinomial logistic + macro-F1 mirrors how the probing test reports
     # multiclass performance, so the SPA's metric-name handling stays uniform.
     # `multi_class` was removed in sklearn 1.7 — sklearn now auto-picks the
     # right strategy based on the solver and number of classes.
-    clf = LogisticRegression(max_iter=500)
+    clf = LogisticRegression(max_iter=500, random_state=rng)
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
     return f1_score(y_test, y_pred, average="macro")
@@ -143,8 +145,15 @@ def run_expressiveness(
 
             def process_fold(fold_idx):
                 indices = np.arange(len(y))
-                np.random.seed(random_state + fold_idx)
-                np.random.shuffle(indices)
+                # Fold-local RNG: folds run under Parallel(backend="threading"),
+                # so seeding the GLOBAL numpy RNG here races across folds and made
+                # the train/test split (and the metric) non-reproducible at
+                # n_jobs > 1. The same RandomState instance is handed to the
+                # score fn so the stochastic SAGA solver continues this exact
+                # stream — bit-identical to the legacy sequential (n_jobs=1)
+                # numbers, but now deterministic at any n_jobs.
+                rng = np.random.RandomState(random_state + fold_idx)
+                rng.shuffle(indices)
                 train_size = int(len(y) * train_ratio)
                 train_idx, test_idx = indices[:train_size], indices[train_size:]
 
@@ -155,7 +164,7 @@ def run_expressiveness(
                     X_train = np.delete(X_train, list(dims_to_remove), axis=1)
                     X_test = np.delete(X_test, list(dims_to_remove), axis=1)
 
-                return score_fn(X_train, X_test, y_train, y_test, verbose)
+                return score_fn(X_train, X_test, y_train, y_test, verbose, rng=rng)
 
             if HAS_JOBLIB and folds > 1:
                 fold_results = Parallel(n_jobs=n_jobs, backend="threading")(

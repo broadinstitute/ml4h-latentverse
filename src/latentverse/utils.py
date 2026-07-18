@@ -3,6 +3,8 @@ PHASE 1 OPTIMIZATION: Intel-accelerated scikit-learn + Numba JIT
 Expected speedup: 2-10x for sklearn operations, 10-100x for correlations
 """
 
+import sys
+
 # QUICK WIN #1: Intel scikit-learn acceleration (2-10x speedup with ZERO code changes!)
 try:
     from sklearnex import patch_sklearn
@@ -11,8 +13,11 @@ try:
     INTEL_OPTIMIZED = True
 except ImportError:
     INTEL_OPTIMIZED = False
+    # Warnings go to stderr, never stdout: stdout must stay clean for callers
+    # that machine-parse a result payload (e.g. the CLI's JSON output).
     print(
-        "Warning: scikit-learn-intelex not installed. Install with: pip install scikit-learn-intelex"
+        "Warning: scikit-learn-intelex not installed. Install with: pip install scikit-learn-intelex",
+        file=sys.stderr,
     )
 
 import os
@@ -48,7 +53,7 @@ try:
     HAS_NUMBA = True
 except ImportError:
     HAS_NUMBA = False
-    print("Warning: numba not installed. Install with: pip install numba")
+    print("Warning: numba not installed. Install with: pip install numba", file=sys.stderr)
 
 if HAS_NUMBA:
 
@@ -246,7 +251,7 @@ def downsample_data(representations, phenotypes, max_samples=1000):
     return representations, phenotypes
 
 
-def fit_logistic(X_train, X_test, y_train, y_test, verbose=False):
+def fit_logistic(X_train, X_test, y_train, y_test, verbose=False, random_state=None):
     """
     Train a logistic regression model and evaluate classification metrics.
 
@@ -254,6 +259,9 @@ def fit_logistic(X_train, X_test, y_train, y_test, verbose=False):
     - X_train, X_test: Feature sets for training and testing
     - y_train, y_test: Corresponding labels
     - verbose: If True, prints dataset details and results
+    - random_state: seed or np.random.RandomState for the (stochastic) SAGA
+      solver. None keeps the legacy behaviour of drawing from the global
+      numpy RNG — pass an explicit value/instance for reproducible fits.
 
     Returns:
     - Dictionary containing classification performance metrics
@@ -264,7 +272,11 @@ def fit_logistic(X_train, X_test, y_train, y_test, verbose=False):
         print(f"\nTest label distribution:\n{pd.Series(y_test).value_counts()}")
 
     clf = LogisticRegression(
-        penalty="elasticnet", solver="saga", class_weight="balanced", l1_ratio=0.5
+        penalty="elasticnet",
+        solver="saga",
+        class_weight="balanced",
+        l1_ratio=0.5,
+        random_state=random_state,
     )
     clf.fit(X_train, y_train)
 

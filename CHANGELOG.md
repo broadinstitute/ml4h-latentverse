@@ -6,15 +6,38 @@ and the project aims for [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`latentverse` command-line interface.** A `latentverse` console script
+  (equivalently `python -m latentverse`) runs the five core evaluations
+  (`clusterability`, `disentanglement`, `expressiveness`, `robustness`,
+  `probing`) and the multimodal decoupling over a representations file
+  (`.csv`/`.tsv`/`.npy`), with optional labels. It reproduces the LatentVerse
+  web application's numbers by driving a duplicated orchestration pipeline
+  (`latentverse.pipeline`) — the same ID-column merge, label coercion,
+  cluster-count heuristic, sanitisation, standardisation, deterministic
+  subsample, row caps, and overridden expressiveness/robustness sweeps the web
+  tier applies — and calling the same `latentverse.evaluations.*` metric
+  functions. A cross-parity test (`tests/test_cross_parity.py`) asserts the CLI
+  and the web app agree to `rtol=1e-9`. See `latentverse --help`.
+  - Reproducibility note: pin `LATENTVERSE_N_JOBS=1` (and single-threaded BLAS)
+    for bit-stable `expressiveness` — its fold RNG is not thread-safe at
+    `n_jobs > 1`. Multimodal runs use a canonical CPU reference config.
+
 ### Changed (breaking)
 
-- **Package rename**: PyPI distribution and Python import name change
-  from `ml4h-latentverse` / `ml4h_latentverse` to `latentverse`.
-  - Old: `pip install ml4h-latentverse` then `from ml4h_latentverse import ...`
-  - New: `pip install latentverse` then `from latentverse import ...`
-  - The previous PyPI project (`ml4h-latentverse`, last release 0.1.2)
-    is orphaned under an inaccessible account; releases continue under
-    the new name.
+- **Import rename**: the Python import name is now `latentverse`
+  (was `ml4h_latentverse`).
+  - Old: `from ml4h_latentverse import ...`
+  - New: `from latentverse import ...`
+  - **Installation is from source** — the name `latentverse` is **not yet
+    published to PyPI**, so `pip install latentverse` does not work today.
+    Install from a checkout (`pip install .`, or `pip install -e ".[dev]"` for
+    development) or directly from the repository
+    (`pip install "git+https://github.com/broadinstitute/ml4h-latentverse@<ref>"`).
+    The previous PyPI project (`ml4h-latentverse`, last release 0.1.2) is
+    orphaned under an inaccessible account; a release under the new name is
+    planned but has not happened yet.
 - **Submodule rename**: `ml4h_latentverse.tests` → `latentverse.evaluations`.
   The old name was misleading (these are public ML evaluation entrypoints,
   not unit tests of the library) and collided with the pytest convention.
