@@ -332,6 +332,11 @@ def _sanitize_features(representations: np.ndarray) -> np.ndarray:
     representations = np.asarray(representations)
     if representations.dtype == object or not np.issubdtype(representations.dtype, np.floating):
         try:
+            if representations.dtype == object:
+                # pyarrow-backed CSV reads surface empty cells as pd.NA (not
+                # float NaN); astype(float64) raises TypeError on pd.NA, so map
+                # missing markers to NaN first and let mean-imputation run.
+                representations = np.where(pd.isna(representations), np.nan, representations)
             representations = representations.astype(np.float64)
         except (ValueError, TypeError):
             raise ValueError("The representation/embedding matrix contains non-numeric values.")
@@ -370,6 +375,27 @@ def _subsample_rows(
         labels = np.asarray(labels)
         return representations[idx], labels[idx], n, True
     return representations, labels, n, False
+
+
+ROWS_EVALUATED_KEY = "Rows evaluated"
+
+
+def _note_row_cap(
+    metrics: Dict[str, Any], n_evaluated: int, n_original: int
+) -> Dict[str, Any]:
+    """app/test_runner.TestRunner._note_row_cap — disclose a fired row cap.
+
+    The supervised tests silently downsample large inputs (the 5k/10k caps) to
+    bound runtime. Without this, the CLI reports metrics computed on a subset
+    as if they used the whole file — the same silent-cap problem the web app
+    fixed. Mirrors the web app's key and format byte-for-byte so a capped run
+    discloses identically on both surfaces.
+    """
+    if n_evaluated < n_original:
+        metrics[ROWS_EVALUATED_KEY] = (
+            f"{n_evaluated:,} of {n_original:,} (subsampled for speed)"
+        )
+    return metrics
 
 
 def _unwrap_metrics(raw: Any) -> Dict[str, Any]:
@@ -418,12 +444,14 @@ def _run_clusterability(
 def _run_disentanglement(representations: np.ndarray, labels: np.ndarray, random_state: int) -> Dict[str, Any]:
     from latentverse.evaluations.disentanglement import run_disentanglement
 
-    representations, labels, _, _ = _subsample_rows(
+    representations, labels, n_original, _ = _subsample_rows(
         representations, labels, _supervised_sample_threshold(), random_state
     )
     # app/ml_adapter.run_disentanglement: labels.reshape(-1, 1).
     raw = run_disentanglement(representations, np.asarray(labels).reshape(-1, 1), random_state=random_state)
-    return dict(_unwrap_metrics(raw))
+    return _note_row_cap(
+        dict(_unwrap_metrics(raw)), int(representations.shape[0]), n_original
+    )
 
 
 def _run_disentanglement_multifactor(
@@ -446,7 +474,7 @@ def _run_expressiveness(
 ) -> Dict[str, Any]:
     from latentverse.evaluations.expressiveness import run_expressiveness
 
-    representations, labels, _, _ = _subsample_rows(
+    representations, labels, n_original, _ = _subsample_rows(
         representations, labels, _supervised_sample_threshold(), random_state
     )
     raw = run_expressiveness(
@@ -456,7 +484,9 @@ def _run_expressiveness(
         plots=False,
         random_state=random_state,
     )
-    return dict(_unwrap_metrics(raw))
+    return _note_row_cap(
+        dict(_unwrap_metrics(raw)), int(representations.shape[0]), n_original
+    )
 
 
 def _run_robustness(
@@ -503,7 +533,9 @@ def _run_probing(representations: np.ndarray, labels: np.ndarray, random_state: 
         n_folds=_probing_full_cv_folds(),
         random_state=random_state,
     )
-    return dict(_unwrap_metrics(raw))
+    return _note_row_cap(
+        dict(_unwrap_metrics(raw)), int(representations.shape[0]), n_samples
+    )
 
 
 # ---------------------------------------------------------------------------

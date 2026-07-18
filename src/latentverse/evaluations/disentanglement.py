@@ -428,8 +428,14 @@ def compute_informativeness_score(representations, labels, is_continuous, random
         informativeness = 1 - (np.mean((y_test - y_pred) ** 2) / np.var(y_test))
     elif len(np.unique(labels)) <= 2:
         # Binary: keep the established linear elastic-net probe (AUROC) so
-        # existing binary-label scores are unchanged.
-        metrics = fit_logistic(X_train, X_test, y_train, y_test)
+        # existing binary-label scores are unchanged. random_state must reach
+        # the SAGA solver: unseeded, its per-epoch shuffling draws from the
+        # GLOBAL numpy RNG, and on fits that stop short of full convergence
+        # the AUROC moves at reported precision with whatever that state
+        # happens to be — with no ConvergenceWarning to give it away.
+        metrics = fit_logistic(
+            X_train, X_test, y_train, y_test, random_state=random_state
+        )
         informativeness = metrics["AUROC"]
     else:
         # Multiclass: fit_logistic is binary-only (predict_proba[:, 1] + binary

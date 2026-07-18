@@ -79,6 +79,16 @@ def parse_stdout_json(proc: subprocess.CompletedProcess) -> dict:
     return json.loads(proc.stdout, parse_constant=_reject_constant)
 
 
+def _find_rows_evaluated(payload: dict):
+    """The 'Rows evaluated' cap annotation, wherever it lands in results
+    (it's set per-label alongside the metric values). None when no cap fired."""
+    results = payload.get("results", {}) if isinstance(payload, dict) else {}
+    for metrics in results.values():
+        if isinstance(metrics, dict) and "Rows evaluated" in metrics:
+            return metrics["Rows evaluated"]
+    return None
+
+
 def assert_clean_error(proc: subprocess.CompletedProcess, *needles: str) -> None:
     assert proc.returncode != 0, f"expected failure, got exit 0; stdout:\n{proc.stdout[:500]}"
     assert "Traceback" not in proc.stderr, f"raw traceback leaked:\n{proc.stderr[-2000:]}"
@@ -419,8 +429,19 @@ class TestRowCaps:
         assert capped1.returncode == uncapped.returncode == 0
         assert capped1.stdout == capped2.stdout
         assert capped1.stdout != uncapped.stdout, f"{env_name}=50 did not change {test} output"
-        # KNOWN GAP (documented): the CLI output does not annotate that a row
-        # cap fired — the web app reports "Rows evaluated"; the CLI omits it.
+        # A fired cap is disclosed with the web app's exact "Rows evaluated"
+        # key/format, so a capped CLI run does not report a downsampled metric
+        # as if it used the whole file. Absent (not empty/false) when uncapped.
+        capped_metrics = parse_stdout_json(capped1)
+        assert _find_rows_evaluated(capped_metrics) == "50 of 107 (subsampled for speed)"
+        assert _find_rows_evaluated(parse_stdout_json(uncapped)) is None
+
+    def test_rows_evaluated_absent_when_no_cap_fires(self):
+        # A run under the cap must NOT carry the annotation (it would falsely
+        # imply a downsample), matching the web app's conditional disclosure.
+        proc = run_cli(*labeled_args("probing"), env={"PROBING_FAST_SAMPLE_THRESHOLD": "5000"})
+        assert proc.returncode == 0
+        assert _find_rows_evaluated(parse_stdout_json(proc)) is None
 
     def test_cap_above_n_is_noop(self):
         capped = run_cli(*labeled_args("expressiveness"), env={"SUPERVISED_SAMPLE_THRESHOLD": "5000"})
@@ -539,22 +560,18 @@ class TestEdgeErrors:
             run_cli(*labeled_args("clusterability"), "--out", os.path.join(edge["dir"], "no", "dir", "r.json")),
         )
 
-    def test_nan_feature_cells_in_csv_rejected_like_webapp(self, edge):
-        # KNOWN SHARED BUG (surfaced by this suite, tracked for a joint fix):
-        # the pyarrow-backed CSV reader yields pd.NA for empty cells, which
-        # fails the float64 coercion BEFORE _sanitize_features' documented
-        # mean-imputation can run — so a CSV with missing cells is rejected
-        # with the (misleading) non-numeric message. The web app behaves
-        # IDENTICALLY (verified via its ComparisonService), so the CLI pins
-        # the shared behaviour here rather than silently diverging; fix both
-        # sides together, then flip this to expect imputation.
-        assert_clean_error(
-            run_cli("clusterability", "--representations", edge["nan_features"], "--id-col", "sample_id"),
-            "non-numeric",
-        )
-
 
 class TestEdgeCorrectResults:
+    def test_nan_feature_cells_in_csv_imputed_like_webapp(self, edge):
+        # The pyarrow-backed CSV reader yields pd.NA for empty cells;
+        # _sanitize_features maps them to float NaN so the documented
+        # mean-imputation runs instead of a misleading non-numeric rejection.
+        # The web app applies the same fix (app/test_runner.py) — the two
+        # sides were flipped together.
+        proc = run_cli("clusterability", "--representations", edge["nan_features"], "--id-col", "sample_id")
+        assert proc.returncode == 0, proc.stderr[-800:]
+        assert_finite_or_null(parse_stdout_json(proc))
+
     def test_single_feature_column(self, edge):
         proc = run_cli("clusterability", "--representations", edge["one_feature"], "--id-col", "sample_id")
         assert proc.returncode == 0, proc.stderr[-800:]

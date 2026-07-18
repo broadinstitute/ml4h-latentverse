@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project aims for [Semantic Versioning](https://semver.org/).
 
+## [0.3.5]
+
+### Fixed
+
+- **Disentanglement informativeness is now deterministic.** The binary branch of
+  `compute_informativeness_score` fit `fit_logistic` (elastic-net
+  LogisticRegression, `solver="saga"`) without `random_state`, so SAGA's
+  per-epoch shuffling drew from the global numpy RNG. On fits that stop short of
+  convergence the AUROC moved at reported precision with the ambient global
+  state (measured 0.46822 / 0.46814 / 0.46818 across three seeds), with no
+  `ConvergenceWarning`. Threads the already-in-scope `random_state` into the
+  solver; converged fits are bit-identical, so well-behaved data is unchanged.
+  **Metric-value change for non-converged fits (a bug fix — the old values were
+  non-reproducible draws).**
+
+- **CSV embeddings with empty cells are now imputed, not rejected.** The
+  pyarrow-backed reader surfaces empty cells as `pd.NA`; `astype(float64)` raised
+  `TypeError` on `pd.NA` before the documented mean-imputation could run, so such
+  uploads were rejected with a misleading "non-numeric values" error. Fixed in
+  both `pipeline._sanitize_features` and the web app's `TestRunner`.
+
+### Added
+
+- **Fired row caps are disclosed via a `"Rows evaluated"` annotation.** The
+  supervised paths silently downsample above the 5k/10k caps; the pipeline now
+  reports `"N of M (subsampled for speed)"` on a fired cap, matching the web
+  app's key/format (closing a latent CLI↔web parity gap).
+
 ## [Unreleased]
 
 ### Added

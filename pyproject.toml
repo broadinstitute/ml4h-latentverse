@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "latentverse"
-version = "0.3.4"
+version = "0.3.5"
 description = "Latentverse evaluation suite + MultiLoReFT multimodal decoupling. Five core tests (clusterability, disentanglement, expressiveness, robustness, probing) over latent representations, plus a multimodal embedding decoupler."
 readme = "README.md"
 requires-python = ">=3.9"
