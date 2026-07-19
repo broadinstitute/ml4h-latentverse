@@ -287,8 +287,6 @@ def visualize_clusterings(
 
     colors = sns.color_palette("tab10", n_colors=10)
 
-    print(labels, "labels")
-    print(cluster_labels, "cluster_labels")
     hue = (
         [colors[l] for l in cluster_labels]
         if labels is None

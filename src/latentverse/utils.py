@@ -1,11 +1,12 @@
 """
-PHASE 1 OPTIMIZATION: Intel-accelerated scikit-learn + Numba JIT
-Expected speedup: 2-10x for sklearn operations, 10-100x for correlations
+Shared numerical helpers for the evaluation metrics: model fitting,
+downsampling, worker-count policy, and optional acceleration shims
+(Intel scikit-learn, Numba JIT) that are used when installed.
 """
 
 import sys
 
-# QUICK WIN #1: Intel scikit-learn acceleration (2-10x speedup with ZERO code changes!)
+# Optional: route scikit-learn through Intel's accelerated backend when installed.
 try:
     from sklearnex import patch_sklearn
 
@@ -46,7 +47,7 @@ from sklearn.metrics import (
     median_absolute_error,
 )
 
-# QUICK WIN #2: Numba JIT compilation for numerical operations (10-100x speedup)
+# Optional: Numba JIT for the hot numerical loops when installed.
 try:
     from numba import jit, prange
 

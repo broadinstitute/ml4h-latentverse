@@ -13,7 +13,7 @@ from latentverse.utils import (
     random_baseline,
 )
 
-# QUICK WIN #3: Joblib parallelization (4-8x speedup on multi-core systems)
+# Optional: joblib parallelizes the per-dimension fits when installed.
 try:
     from joblib import Parallel, delayed
 

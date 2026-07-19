@@ -6,7 +6,7 @@ matplotlib.use("Agg")
 
 from latentverse.utils import get_n_jobs
 
-# QUICK WIN: Joblib parallelization for noise levels
+# Optional: joblib parallelizes across noise levels when installed.
 try:
     from joblib import Parallel, delayed
 

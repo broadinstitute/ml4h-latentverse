@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import r2_score, accuracy_score, roc_auc_score
 
-# QUICK WIN: Numba-accelerated entropy and disentanglement calculations
+# Optional: Numba accelerates the entropy calculations when installed.
 try:
     from numba import jit
 

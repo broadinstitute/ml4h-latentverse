@@ -256,6 +256,30 @@ class TestHappyPath:
 
         assert proc.stdout.strip() == latentverse.__version__
 
+    def test_top_level_help_lists_every_subcommand(self):
+        proc = run_cli("--help")
+        assert proc.returncode == 0
+        for sub in [*CORE_TESTS, "multimodal"]:
+            assert sub in proc.stdout, f"--help does not mention subcommand {sub!r}"
+        assert "--version" in proc.stdout
+
+    @pytest.mark.parametrize("sub", [*CORE_TESTS, "multimodal"])
+    def test_subcommand_help_documents_every_flag(self, sub):
+        common = [
+            "--representations", "--labels", "--id-col", "--label-cols",
+            "--labels-id-col", "--seed", "--standardize", "--subsample",
+            "--n-clusters", "--noise-levels", "--percent-removed",
+            "--out", "--format",
+        ]
+        extra = {
+            "robustness": ["--robustness-metric"],
+            "multimodal": ["--representations2", "--rep2-id-col", "--test-type", "--robustness-metric"],
+        }
+        proc = run_cli(sub, "--help")
+        assert proc.returncode == 0
+        for flag in common + extra.get(sub, []):
+            assert flag in proc.stdout, f"{sub} --help does not document {flag}"
+
     def test_no_subcommand_is_usage_error(self):
         proc = run_cli()
         assert proc.returncode == 2
