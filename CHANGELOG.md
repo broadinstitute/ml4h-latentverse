@@ -6,34 +6,6 @@ and the project aims for [Semantic Versioning](https://semver.org/).
 
 ## [0.3.5]
 
-### Fixed
-
-- **Disentanglement informativeness is now deterministic.** The binary branch of
-  `compute_informativeness_score` fit `fit_logistic` (elastic-net
-  LogisticRegression, `solver="saga"`) without `random_state`, so SAGA's
-  per-epoch shuffling drew from the global numpy RNG. On fits that stop short of
-  convergence the AUROC moved at reported precision with the ambient global
-  state (measured 0.46822 / 0.46814 / 0.46818 across three seeds), with no
-  `ConvergenceWarning`. Threads the already-in-scope `random_state` into the
-  solver; converged fits are bit-identical, so well-behaved data is unchanged.
-  **Metric-value change for non-converged fits (a bug fix — the old values were
-  non-reproducible draws).**
-
-- **CSV embeddings with empty cells are now imputed, not rejected.** The
-  pyarrow-backed reader surfaces empty cells as `pd.NA`; `astype(float64)` raised
-  `TypeError` on `pd.NA` before the documented mean-imputation could run, so such
-  uploads were rejected with a misleading "non-numeric values" error. Fixed in
-  both `pipeline._sanitize_features` and the web app's `TestRunner`.
-
-### Added
-
-- **Fired row caps are disclosed via a `"Rows evaluated"` annotation.** The
-  supervised paths silently downsample above the 5k/10k caps; the pipeline now
-  reports `"N of M (subsampled for speed)"` on a fired cap, matching the web
-  app's key/format (closing a latent CLI↔web parity gap).
-
-## [Unreleased]
-
 ### Added
 
 - **`latentverse` command-line interface.** A `latentverse` console script
@@ -46,11 +18,16 @@ and the project aims for [Semantic Versioning](https://semver.org/).
   cluster-count heuristic, sanitisation, standardisation, deterministic
   subsample, row caps, and overridden expressiveness/robustness sweeps the web
   tier applies — and calling the same `latentverse.evaluations.*` metric
-  functions. A cross-parity test (`tests/test_cross_parity.py`) asserts the CLI
+  functions. An internal cross-parity check asserts the CLI
   and the web app agree to `rtol=1e-9`. See `latentverse --help`.
   - Reproducibility note: pin `LATENTVERSE_N_JOBS=1` (and single-threaded BLAS)
     for bit-stable `expressiveness` — its fold RNG is not thread-safe at
     `n_jobs > 1`. Multimodal runs use a canonical CPU reference config.
+
+- **Fired row caps are disclosed via a `"Rows evaluated"` annotation.** The
+  supervised paths silently downsample above the 5k/10k caps; the pipeline now
+  reports `"N of M (subsampled for speed)"` on a fired cap, matching the web
+  app's key/format (closing a latent CLI↔web parity gap).
 
 ### Changed (breaking)
 
@@ -85,6 +62,25 @@ and the project aims for [Semantic Versioning](https://semver.org/).
   `[tool.pytest.ini_options]`; will not accidentally collect the
   package's own evaluations submodule.
 - GitHub Actions CI added: ruff lint + pytest on push and PR.
+
+### Fixed
+
+- **Disentanglement informativeness is now deterministic.** The binary branch of
+  `compute_informativeness_score` fit `fit_logistic` (elastic-net
+  LogisticRegression, `solver="saga"`) without `random_state`, so SAGA's
+  per-epoch shuffling drew from the global numpy RNG. On fits that stop short of
+  convergence the AUROC moved at reported precision with the ambient global
+  state (measured 0.46822 / 0.46814 / 0.46818 across three seeds), with no
+  `ConvergenceWarning`. Threads the already-in-scope `random_state` into the
+  solver; converged fits are bit-identical, so well-behaved data is unchanged.
+  **Metric-value change for non-converged fits (a bug fix — the old values were
+  non-reproducible draws).**
+
+- **CSV embeddings with empty cells are now imputed, not rejected.** The
+  pyarrow-backed reader surfaces empty cells as `pd.NA`; `astype(float64)` raised
+  `TypeError` on `pd.NA` before the documented mean-imputation could run, so such
+  uploads were rejected with a misleading "non-numeric values" error. Fixed in
+  both `pipeline._sanitize_features` and the companion web application's equivalent.
 
 ## [0.3.2] - 2026-07
 
@@ -131,8 +127,8 @@ speedup.
 ## [0.3.1] - 2026-07
 
 Scale-hardening follow-up: bound the evaluations' internal parallelism and
-cap robustness peak memory so many-label web-app runs don't oversubscribe a
-Cloud Run instance.
+cap robustness peak memory so many-label web-app runs don't oversubscribe the
+host.
 
 ### Changed (non-breaking)
 

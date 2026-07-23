@@ -1,6 +1,6 @@
-"""Multimodal decoupling pipeline — a faithful DUPLICATE of the web app's
-MultiLoReFT orchestration (app/multimodal_service.MultimodalService.
-decouple_representations + app/comparison_service._process_multimodal), run in a
+"""Multimodal decoupling pipeline — a faithful DUPLICATE of the companion web
+application's MultiLoReFT orchestration (its multimodal decoupling service plus
+the multimodal branch of its comparison orchestration), run in a
 CANONICAL CPU REFERENCE CONFIG so the result is reproducible.
 
 Parity note (verified): the web app runs MultiLoReFT on GPU-or-CPU ("auto") with
@@ -30,7 +30,7 @@ from latentverse import pipeline as _pl
 logger = logging.getLogger(__name__)
 
 
-# app/config.py mirror (same env names + defaults as Config.MULTILOREFT_*).
+# Companion web application config mirror (same env names + defaults).
 def _cfg_int(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, str(default)))
@@ -80,7 +80,7 @@ def decouple_representations(
     random_state: int = 42,
     standardize: bool = MULTILOREFT_STANDARDIZE,
 ) -> Dict[str, np.ndarray]:
-    """Duplicate MultimodalService.decouple_representations for n_restarts=1 on
+    """Duplicate the companion web application's decoupling for n_restarts=1 on
     CPU. Every op mirrors the web app site-for-site so the learned subspaces
     match under the canonical config."""
     import torch
@@ -97,7 +97,7 @@ def decouple_representations(
     n_samples = rep1.shape[0]
     dim1, dim2 = rep1.shape[1], rep2.shape[1]
 
-    # app/multimodal_service.py:209-213 — per-feature standardize, then float32.
+    # Companion web application parity — per-feature standardize, then float32.
     if standardize:
         rep1 = (rep1 - rep1.mean(axis=0)) / (rep1.std(axis=0) + 1e-8)
         rep2 = (rep2 - rep2.mean(axis=0)) / (rep2.std(axis=0) + 1e-8)
@@ -105,7 +105,7 @@ def decouple_representations(
         rep2 = np.ascontiguousarray(rep2, dtype=np.float32)
 
     base_seed = int(random_state)
-    # MultimodalService.__init__: self.batch_size = max(batch_size, 1024).
+    # Companion web application parity: batch_size = max(batch_size, 1024).
     batch_size = max(MULTILOREFT_BATCH_SIZE, 1024)
     max_epochs = _mm_max_epochs()
     train_cap = _mm_train_sample_cap()
@@ -196,8 +196,8 @@ def decouple_representations(
 
 
 def run_multimodal_pipeline(cfg: "_pl.PipelineConfig") -> Dict[str, Dict[str, Any]]:
-    """Duplicate app/comparison_service._process_multimodal: align two rep files,
-    decouple, and run ``cfg.test_type`` on each of the three subspaces.
+    """Duplicate the companion web application's multimodal orchestration: align
+    two rep files, decouple, and run ``cfg.test_type`` on each of the three subspaces.
 
     Returns ``{subspace_name: {label_or_mode: raw_metrics}}``."""
     _pl.pin_deterministic_defaults()

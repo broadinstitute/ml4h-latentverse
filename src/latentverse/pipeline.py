@@ -13,17 +13,18 @@ robustness noise levels). A CLI that called ``run_*`` directly would therefore
 produce **different numbers** than the web UI.
 
 This module reproduces that orchestration inside the library so the CLI matches
-the web numbers, and a cross-parity test (``tests/test_cross_parity.py``) asserts
+the web numbers, and an internal cross-parity check asserts
 the two stay byte-for-byte in agreement. The duplication is deliberate
 (architecture "Option (c)"): the production web app is *not* modified; drift is
 *caught* by the parity test rather than *prevented* by single-sourcing.
 
-Provenance — every transformation below mirrors a specific web-app site:
-    app/comparison_service.py  (process_comparison / _process_multimodal)
-    app/test_runner.py         (TestRunner._run_single_label_test / _execute_test)
-    app/ml_adapter.py          (MLAdapter.run_*)
-    app/data_processor.py      (DataProcessor.load_* / merge_dataframes / encode_*)
-    app/config.py              (Config.*_SAMPLE_THRESHOLD, MULTILOREFT_*)
+Provenance — every transformation below mirrors a specific part of the
+companion web application's evaluation stack:
+    comparison orchestration  (request -> load -> merge -> subsample -> dispatch)
+    the per-test runner       (label handling, sanitisation, standardisation, caps)
+    the metric adapter        (evaluation calls + result unwrapping)
+    the data loader           (file reads, ID merge, label encoding)
+    the configuration layer   (sample-threshold and multimodal env knobs)
 
 What is deliberately NOT duplicated (none of it touches the five numbers):
     async orchestration, plot generation, progress callbacks, provenance blocks,
@@ -45,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Config — read from the SAME environment variables the web app's Config reads,
+# Config — read from the SAME environment variables the companion web application reads,
 # with identical defaults, so a run under a pinned environment matches the web
 # tier. Read lazily (per call) rather than at import so a test can set the env
 # and get the same value the web app's import-time read would.
@@ -77,31 +78,31 @@ def pin_deterministic_defaults() -> None:
 
 
 def _supervised_sample_threshold() -> int:
-    # app/config.py: Config.SUPERVISED_SAMPLE_THRESHOLD (disentanglement,
+    # SUPERVISED_SAMPLE_THRESHOLD env var (disentanglement,
     # expressiveness). Default 5000.
     return _env_int("SUPERVISED_SAMPLE_THRESHOLD", 5000)
 
 
 def _probing_sample_threshold() -> int:
-    # app/config.py: Config.PROBING_FAST_SAMPLE_THRESHOLD. Default 10000.
+    # PROBING_FAST_SAMPLE_THRESHOLD env var. Default 10000.
     return _env_int("PROBING_FAST_SAMPLE_THRESHOLD", 10000)
 
 
 def _probing_full_cv_folds() -> int:
-    # app/config.py: Config.PROBING_FULL_CV_FOLDS. Default 3.
+    # PROBING_FULL_CV_FOLDS env var. Default 3.
     return _env_int("PROBING_FULL_CV_FOLDS", 3)
 
 
-# app/comparison_service.py: _MAX_NUM_CLUSTERS (Finding #6 clamp). Default 1000.
+# MAX_NUM_CLUSTERS env var (cluster-count clamp). Default 1000.
 def _max_num_clusters() -> int:
     return _env_int("MAX_NUM_CLUSTERS", 1000)
 
 
-# app/ml_adapter.py:177 — the web app OVERRIDES the library's expressiveness
+# The companion web application OVERRIDES the library's expressiveness
 # default ([0, 5, 10, 20]) with this sweep.
 DEFAULT_PERCENT_REMOVED: List[int] = [0, 10, 20, 30, 40, 50]
 
-# app/ml_adapter.py:199 — the library's run_robustness has NO default for
+# The library's run_robustness has NO default for
 # noise_levels (a required positional); the web app always passes this.
 DEFAULT_NOISE_LEVELS: List[float] = [0.1, 0.2, 0.3, 0.4, 0.5]
 
@@ -117,9 +118,9 @@ CORE_TESTS = (
 
 
 # ---------------------------------------------------------------------------
-# Data loading — duplicates app/data_processor.py. For files below the web app's
-# 50 MB polars threshold (the only regime a CLI fixture hits) the web app reads
-# via pandas with ``dtype_backend="pyarrow"``; we mirror that so dtypes — and
+# Data loading — duplicates the companion web application's data loader. For files
+# below its 50 MB polars threshold (the only regime a CLI fixture hits) the web app
+# reads via pandas with ``dtype_backend="pyarrow"``; we mirror that so dtypes — and
 # therefore the merge / NaN handling — line up exactly.
 # ---------------------------------------------------------------------------
 try:  # pyarrow is a hard dep of the web app's reader; mirror its presence.
@@ -131,7 +132,7 @@ except ImportError:  # pragma: no cover
 
 
 def _detect_delimiter(first_line: str) -> str:
-    """app/data_processor.py:_detect_delimiter (single source of truth)."""
+    """Companion web application's delimiter detection (single source of truth)."""
     tab, comma, semi = (
         first_line.count("\t"),
         first_line.count(","),
@@ -147,7 +148,7 @@ def _detect_delimiter(first_line: str) -> str:
 
 
 def _is_headerless_csv(file_path: str) -> bool:
-    """app/data_processor.py:_is_headerless_csv (first row all-numeric)."""
+    """Companion web application's headerless-CSV detection (first row all-numeric)."""
     try:
         with open(file_path, "r") as f:
             first_line = f.readline().strip()
@@ -169,8 +170,8 @@ def _is_headerless_csv(file_path: str) -> bool:
 
 
 def _read_csv(file_path: str) -> pd.DataFrame:
-    """Mirror app/fast_csv_reader.read_csv_fast's small-file pandas path plus
-    app/data_processor.load_csv's headerless synthesis + __row_id__ insert."""
+    """Mirror the companion web application's small-file pandas CSV path plus
+    its headerless synthesis + __row_id__ insert."""
     with open(file_path, "r") as f:
         first_line = f.readline().strip()
     delimiter = _detect_delimiter(first_line)
@@ -192,7 +193,7 @@ def _read_csv(file_path: str) -> pd.DataFrame:
 
 
 def _load_npy(file_path: str) -> pd.DataFrame:
-    """app/data_processor.load_npy (allow_pickle=False, col_i names, __row_id__)."""
+    """Companion web application's NPY loader (allow_pickle=False, col_i names, __row_id__)."""
     arr = np.asarray(np.load(file_path, allow_pickle=False))
     if arr.ndim == 1:
         arr = arr.reshape(-1, 1)
@@ -206,7 +207,7 @@ def _load_npy(file_path: str) -> pd.DataFrame:
 
 
 def load_representation_file(file_path: str, id_column: Optional[str] = None) -> pd.DataFrame:
-    """app/data_processor.load_representation_file (dispatch on extension)."""
+    """Companion web application's representation-file loader (dispatch on extension)."""
     ext = os.path.splitext(file_path)[1].lower()
     if ext == ".npy":
         return _load_npy(file_path)
@@ -214,7 +215,7 @@ def load_representation_file(file_path: str, id_column: Optional[str] = None) ->
 
 
 def _normalize_id_series(s: pd.Series) -> pd.Series:
-    """app/data_processor.normalize_id_series (merge-safe string key)."""
+    """Companion web application's ID normalisation (merge-safe string key)."""
     text = s.astype(str).str.strip()
     return text.str.replace(r"^([+-]?\d+)\.0+$", r"\1", regex=True)
 
@@ -226,7 +227,7 @@ def _merge_dataframes(
     labels_id_col: str,
     how: str = "inner",
 ) -> pd.DataFrame:
-    """app/data_processor.merge_dataframes — latent_* rename + normalized join.
+    """Companion web application's dataframe merge — latent_* rename + normalized join.
 
     Operates on copies (the web app renames in place; we avoid mutating the
     caller's frames, which is behaviourally identical for the resulting merge)."""
@@ -247,7 +248,7 @@ def _merge_dataframes(
 
 
 def _prepare_representation_only_df(rep_df: pd.DataFrame, rep_id_col: Optional[str]) -> pd.DataFrame:
-    """app/comparison_service._prepare_representation_only_df."""
+    """Companion web application's representation-only preparation."""
     id_like = set()
     if rep_id_col:
         id_like.add(rep_id_col)
@@ -261,7 +262,7 @@ def _prepare_representation_only_df(rep_df: pd.DataFrame, rep_id_col: Optional[s
 
 
 def _extract_latent_and_labels(merged_df: pd.DataFrame, label_column: str) -> Tuple[np.ndarray, np.ndarray]:
-    """app/data_processor.extract_latent_and_labels (drops NaN-label rows)."""
+    """Companion web application's latent/label extraction (drops NaN-label rows)."""
     representations = merged_df.filter(regex="^latent_").to_numpy()
     labels = merged_df[label_column].to_numpy()
     mask = ~pd.isna(labels)
@@ -271,10 +272,10 @@ def _extract_latent_and_labels(merged_df: pd.DataFrame, label_column: str) -> Tu
 
 
 # ---------------------------------------------------------------------------
-# Preprocessing — duplicates app/test_runner.py static helpers.
+# Preprocessing — duplicates the companion web application's runner static helpers.
 # ---------------------------------------------------------------------------
 def _estimate_num_clusters(representations: np.ndarray, labels: Optional[np.ndarray] = None) -> int:
-    """app/test_runner.TestRunner._estimate_num_clusters."""
+    """Companion web application's cluster-count heuristic."""
     n_samples = max(2, int(representations.shape[0]))
     if labels is not None:
         valid = labels[~pd.isna(labels)]
@@ -289,7 +290,7 @@ def _estimate_num_clusters(representations: np.ndarray, labels: Optional[np.ndar
 
 
 def _encode_optional_labels(labels: np.ndarray) -> np.ndarray:
-    """app/test_runner.TestRunner._encode_optional_labels (NaN preserved)."""
+    """Companion web application's optional-label encoding (NaN preserved)."""
     labels = np.asarray(labels)
     encoded = np.full(labels.shape[0], np.nan, dtype=np.float64)
     valid_mask = ~pd.isna(labels)
@@ -300,7 +301,7 @@ def _encode_optional_labels(labels: np.ndarray) -> np.ndarray:
 
 
 def _to_numeric_labels(labels: np.ndarray) -> np.ndarray:
-    """app/test_runner.TestRunner._to_numeric_labels (supervised coercion)."""
+    """Companion web application's numeric-label coercion (supervised)."""
     labels = np.asarray(labels)
     if labels.dtype != object and np.issubdtype(labels.dtype, np.number):
         return labels.astype(np.float64)
@@ -313,7 +314,7 @@ def _to_numeric_labels(labels: np.ndarray) -> np.ndarray:
 
 
 def _encode_labels(labels: np.ndarray) -> Tuple[np.ndarray, int]:
-    """app/data_processor.encode_labels (factorise; require >= 2 classes)."""
+    """Companion web application's label encoding (factorise; require >= 2 classes)."""
     unique_labels, inverse = np.unique(labels, return_inverse=True)
     num_unique = len(unique_labels)
     if num_unique < 2:
@@ -325,7 +326,7 @@ def _encode_labels(labels: np.ndarray) -> Tuple[np.ndarray, int]:
 
 
 def _sanitize_features(representations: np.ndarray) -> np.ndarray:
-    """app/test_runner.TestRunner._sanitize_features (finite float64, mean-impute).
+    """Companion web application's feature sanitisation (finite float64, mean-impute).
 
     Returns the clean matrix only (the web app also returns a user-facing note,
     which does not affect any metric value)."""
@@ -352,7 +353,7 @@ def _sanitize_features(representations: np.ndarray) -> np.ndarray:
 
 
 def _maybe_standardize(representations: np.ndarray, enabled: bool) -> np.ndarray:
-    """app/test_runner.TestRunner._maybe_standardize."""
+    """Companion web application's optional standardisation."""
     if not enabled:
         return representations
     if representations.dtype == object or not np.issubdtype(representations.dtype, np.floating):
@@ -366,7 +367,7 @@ def _maybe_standardize(representations: np.ndarray, enabled: bool) -> np.ndarray
 def _subsample_rows(
     representations: np.ndarray, labels: np.ndarray, threshold: int, random_state: int
 ) -> Tuple[np.ndarray, np.ndarray, int, bool]:
-    """app/test_runner.TestRunner._subsample_rows (seeded, sorted indices)."""
+    """Companion web application's row subsample (seeded, sorted indices)."""
     n = int(representations.shape[0])
     if threshold and threshold > 0 and n > threshold:
         rng = np.random.default_rng(random_state)
@@ -383,7 +384,7 @@ ROWS_EVALUATED_KEY = "Rows evaluated"
 def _note_row_cap(
     metrics: Dict[str, Any], n_evaluated: int, n_original: int
 ) -> Dict[str, Any]:
-    """app/test_runner.TestRunner._note_row_cap — disclose a fired row cap.
+    """Companion web application's row-cap annotation — disclose a fired row cap.
 
     The supervised tests silently downsample large inputs (the 5k/10k caps) to
     bound runtime. Without this, the CLI reports metrics computed on a subset
@@ -399,7 +400,7 @@ def _note_row_cap(
 
 
 def _unwrap_metrics(raw: Any) -> Dict[str, Any]:
-    """app/ml_adapter.MLAdapter._unwrap_metrics (tolerate results/metrics)."""
+    """Companion web application's metric unwrapping (tolerate results/metrics)."""
     if not isinstance(raw, dict):
         return {}
     if "results" in raw and isinstance(raw["results"], dict):
@@ -410,8 +411,8 @@ def _unwrap_metrics(raw: Any) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Per-test execution — duplicates the adapter calls (app/ml_adapter.py) plus the
-# runner's per-test wrapping (app/test_runner.py). Returns RAW metric dicts.
+# Per-test execution — duplicates the companion web application's metric-adapter
+# calls plus its per-test runner wrapping. Returns RAW metric dicts.
 # ---------------------------------------------------------------------------
 def _run_clusterability(
     representations: np.ndarray,
@@ -429,7 +430,7 @@ def _run_clusterability(
         random_state=random_state,
     )
     metrics = dict(_unwrap_metrics(raw))
-    # app/test_runner._run_clusterability: single-class / unlabeled → intrinsic
+    # Companion web application parity: single-class / unlabeled → intrinsic
     # metrics only (the library still returns the NMI/CL slots as None).
     valid_labels = labels[~pd.isna(labels)] if labels is not None else np.asarray([])
     if labels is None or len(valid_labels) == 0 or len(np.unique(valid_labels)) < 2:
@@ -447,7 +448,7 @@ def _run_disentanglement(representations: np.ndarray, labels: np.ndarray, random
     representations, labels, n_original, _ = _subsample_rows(
         representations, labels, _supervised_sample_threshold(), random_state
     )
-    # app/ml_adapter.run_disentanglement: labels.reshape(-1, 1).
+    # Companion web application parity: labels.reshape(-1, 1).
     raw = run_disentanglement(representations, np.asarray(labels).reshape(-1, 1), random_state=random_state)
     return _note_row_cap(
         dict(_unwrap_metrics(raw)), int(representations.shape[0]), n_original
@@ -539,8 +540,8 @@ def _run_probing(representations: np.ndarray, labels: np.ndarray, random_state: 
 
 
 # ---------------------------------------------------------------------------
-# Runner-level orchestration — duplicates app/test_runner._run_single_label_test
-# + _execute_test for one label column.
+# Runner-level orchestration — duplicates the companion web application's
+# per-label-column test execution.
 # ---------------------------------------------------------------------------
 def _run_single_label(
     merged_df: pd.DataFrame,
@@ -585,8 +586,8 @@ def _run_single_label(
     representations = _sanitize_features(representations)
     representations = _maybe_standardize(representations, standardize)
     labels = _to_numeric_labels(np.asarray(labels))
-    # app/test_runner:796 encode_labels is called (raises on < 2 classes) even
-    # though only `labels` is passed to the supervised metric.
+    # Companion web application parity: encode_labels is called (raises on < 2
+    # classes) even though only `labels` is passed to the supervised metric.
     _encode_labels(labels)
 
     if test_type == "disentanglement":
@@ -609,7 +610,7 @@ def _run_unlabeled(
     num_clusters_override: Optional[int],
     noise_levels: List[float],
 ) -> Dict[str, Any]:
-    """app/test_runner._run_unlabeled_test (intrinsic clustering only)."""
+    """Companion web application's unlabeled test path (intrinsic clustering only)."""
     representations = _sanitize_features(np.asarray(merged_df.filter(regex="^latent_").to_numpy()))
     if representations.shape[0] < 2:
         raise ValueError(f"Need at least 2 representation rows for clustering, got {representations.shape[0]}.")
@@ -626,12 +627,12 @@ def _run_unlabeled(
 
 # ---------------------------------------------------------------------------
 # Top-level configuration + entrypoint — duplicates the number-affecting part of
-# app/comparison_service.process_comparison.
+# the companion web application's comparison orchestration.
 # ---------------------------------------------------------------------------
 @dataclass
 class PipelineConfig:
     """Everything the web app derives from a comparison request that changes the
-    numbers. Field names mirror the web app's ``comp_data`` keys where useful."""
+    numbers. Field names mirror the web app's comparison-request fields where useful."""
 
     test_type: str
     representations_path: str
@@ -651,8 +652,8 @@ class PipelineConfig:
     rep2_id_col: Optional[str] = None
 
     def __post_init__(self) -> None:
-        # app/comparison_service.py:809-823 — sub-2 subsample dropped; k < 2
-        # dropped; k clamped to _MAX_NUM_CLUSTERS.
+        # Companion web application parity — sub-2 subsample dropped; k < 2
+        # dropped; k clamped to the max-num-clusters bound.
         if self.subsample_rows is not None and self.subsample_rows < 2:
             self.subsample_rows = None
         if self.num_clusters_override is not None:
@@ -670,7 +671,7 @@ def _missing_column(kind: str, name: str, df: pd.DataFrame) -> ValueError:
 
 
 def _load_and_merge(cfg: PipelineConfig) -> Tuple[pd.DataFrame, List[str]]:
-    """Reproduce process_comparison's load → merge → deterministic subsample."""
+    """Reproduce the companion web application's load → merge → deterministic subsample."""
     rep_df = load_representation_file(cfg.representations_path, cfg.rep_id_col)
     selected_labels = list(cfg.label_cols)
 
@@ -711,7 +712,7 @@ def _load_and_merge(cfg: PipelineConfig) -> Tuple[pd.DataFrame, List[str]]:
         merged_df = _prepare_representation_only_df(rep_df, cfg.rep_id_col)
         selected_labels = []
 
-    # process_comparison:827 — deterministic pre-run subsample (seeded).
+    # Companion web application parity — deterministic pre-run subsample (seeded).
     if cfg.subsample_rows is not None and len(merged_df) > cfg.subsample_rows:
         merged_df = merged_df.sample(n=cfg.subsample_rows, random_state=cfg.random_seed).reset_index(drop=True)
 
@@ -719,7 +720,7 @@ def _load_and_merge(cfg: PipelineConfig) -> Tuple[pd.DataFrame, List[str]]:
 
 
 def _labels_required(test_type: str, robustness_metric: Optional[str]) -> bool:
-    """app/comparison_service._labels_required_for_test."""
+    """Companion web application's per-test label requirement."""
     if test_type in {"disentanglement", "expressiveness", "probing"}:
         return True
     if test_type == "robustness":
@@ -753,7 +754,7 @@ def run_pipeline(cfg: PipelineConfig) -> Dict[str, Dict[str, Any]]:
         )
         return {"Intrinsic (No Labels)": result}
 
-    # Multi-factor disentanglement (>= 2 label columns) — app/test_runner:304.
+    # Multi-factor disentanglement (>= 2 label columns) — companion web application parity.
     if cfg.test_type == "disentanglement" and len(selected_labels) > 1:
         representations = _sanitize_features(np.asarray(merged_df.filter(regex="^latent_").to_numpy()))
         representations = _maybe_standardize(representations, cfg.standardize)

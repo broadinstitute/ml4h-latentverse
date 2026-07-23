@@ -19,7 +19,7 @@ built in a session tmpdir.
 
 Runtime notes: multimodal cases set ``MULTILOREFT_MAX_EPOCHS=2`` to keep the
 MultiLoReFT trainings short — numeric parity for multimodal is asserted
-elsewhere (``test_cross_parity.py``) under the canonical config; here we test
+by an internal cross-parity check under the canonical config; here we test
 the CLI surface (exit codes, output shape, error text).
 """
 
@@ -431,6 +431,25 @@ class TestDeterminism:
         assert base.returncode == got.returncode == 0
         assert got.stdout == base.stdout, f"expressiveness diverged at LATENTVERSE_N_JOBS={n_jobs}"
 
+    def test_multimodal_byte_identical_run_to_run(self):
+        # PARITY ≠ DETERMINISM: the multimodal cross-parity check
+        # compares ONE CLI run to ONE web-app run under the canonical CPU config; if
+        # the underlying MultiLoReFT number were nondeterministic, that single-run
+        # comparison could still pass while the value drifted run-to-run. Guard the
+        # missing half here: the CLI multimodal path pins its own determinism
+        # (pipeline_multimodal.configure_deterministic_cpu → use_deterministic_algorithms,
+        # single-threaded torch), so two runs must be byte-identical. MAX_EPOCHS=2
+        # keeps it fast; run-to-run stability is independent of epoch count.
+        args = [
+            "multimodal", "--representations", REP, "--representations2", REP2,
+            "--id-col", "sample_id", "--rep2-id-col", "sample_id",
+            "--labels", LABELS, "--label-cols", "group", "--test-type", "clusterability",
+        ]
+        a = run_cli(*args, env={"MULTILOREFT_MAX_EPOCHS": "2"})
+        b = run_cli(*args, env={"MULTILOREFT_MAX_EPOCHS": "2"})
+        assert a.returncode == b.returncode == 0, (a.stderr[-800:], b.stderr[-800:])
+        assert a.stdout == b.stdout, "multimodal output is not deterministic run-to-run"
+
 
 # ---------------------------------------------------------------------------
 # Row caps — env-tunable thresholds actually fire and are deterministic
@@ -590,7 +609,7 @@ class TestEdgeCorrectResults:
         # The pyarrow-backed CSV reader yields pd.NA for empty cells;
         # _sanitize_features maps them to float NaN so the documented
         # mean-imputation runs instead of a misleading non-numeric rejection.
-        # The web app applies the same fix (app/test_runner.py) — the two
+        # The companion web application applies the same fix — the two
         # sides were flipped together.
         proc = run_cli("clusterability", "--representations", edge["nan_features"], "--id-col", "sample_id")
         assert proc.returncode == 0, proc.stderr[-800:]

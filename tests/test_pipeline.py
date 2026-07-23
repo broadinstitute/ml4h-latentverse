@@ -73,7 +73,7 @@ def test_probing_cap_triggers_and_is_deterministic(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# num_clusters heuristic (app/test_runner._estimate_num_clusters).
+# num_clusters heuristic (companion web application's cluster-count heuristic).
 # ---------------------------------------------------------------------------
 def test_estimate_num_clusters_label_aware():
     reps = np.zeros((200, 4))
@@ -89,7 +89,7 @@ def test_estimate_num_clusters_unlabeled_sqrt_bounded():
 
 
 # ---------------------------------------------------------------------------
-# Label coercion / encoding (app/test_runner._to_numeric_labels / _encode_*).
+# Label coercion / encoding (companion web application's numeric coercion + encoding).
 # ---------------------------------------------------------------------------
 def test_to_numeric_labels_passthrough_numeric():
     out = pl._to_numeric_labels(np.array([0.0, 1.0, 2.0]))
@@ -119,7 +119,7 @@ def test_encode_labels_rejects_single_class():
 
 
 # ---------------------------------------------------------------------------
-# Merge + NaN-label drop (app/data_processor.merge_dataframes / extract_*).
+# Merge + NaN-label drop (companion web application's dataframe merge + extraction).
 # ---------------------------------------------------------------------------
 def test_inner_merge_drops_unmatched_then_nan_labels():
     # Supervised path: inner merge (110 matched of 120) then NaN-label drop (3).
@@ -139,7 +139,7 @@ def test_left_merge_keeps_all_rows_for_clustering():
 
 
 # ---------------------------------------------------------------------------
-# PipelineConfig clamps (app/comparison_service.py:809-823).
+# PipelineConfig clamps (mirrors the companion web application's clamps).
 # ---------------------------------------------------------------------------
 def test_config_drops_subsample_below_two():
     assert _base_cfg("clusterability", subsample_rows=1).subsample_rows is None

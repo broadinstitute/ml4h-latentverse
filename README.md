@@ -1,13 +1,14 @@
 # latentverse
 
 A Python library for evaluating the quality of latent representations. Five
-core tests, plus a separate module for decoupling multimodal embeddings.
+core tests, plus a separate module for decoupling multimodal embeddings. Use
+it from Python or from the `latentverse` command line.
 
 The five tests, in brief:
 
 | Test | What it asks |
 |---|---|
-| **Clusterability** | Do these representations form meaningful clusters? Optional ground-truth labels enable NMI / Cluster Learnability; without labels you still get Silhouette + Davies–Bouldin. |
+| **Clusterability** | Do these representations form meaningful clusters? Optional ground-truth labels enable NMI / Cluster Learnability; without labels you still get Silhouette + Davies-Bouldin. |
 | **Disentanglement** | How independent are the latent dimensions? Reports DCI, MIG, Total Correlation, SAP. |
 | **Expressiveness** | How much of the label signal is recoverable from the representations, and how does that signal degrade as you remove highly-correlated dimensions? |
 | **Robustness** | What happens to performance under Gaussian noise of varying magnitude? Pick `metric="clustering"` or `metric="probing"`. |
@@ -36,7 +37,7 @@ cd ml4h-latentverse
 pip install -e ".[dev]"
 ```
 
-Requires Python ≥ 3.9.
+Requires Python 3.9 or newer.
 
 > Note: the package was previously published on PyPI as
 > `ml4h-latentverse` (last release 0.1.2, March 2025) under an account
@@ -69,6 +70,31 @@ pass `num_clusters` to override the auto-derived value, and
 For a complete end-to-end demo that runs all five tests + multimodal on
 synthetic data in under 30 seconds, see `examples/run_cli.py`.
 
+## Command line
+
+The same tests are available as a `latentverse` command, so you can run an
+evaluation without writing any Python. Point it at a representations file and,
+for the supervised tests, a labels file:
+
+```bash
+latentverse clusterability --representations reps.csv --labels labels.csv \
+    --id-col sample_id --label-cols class
+
+latentverse probing        --representations reps.npy --labels labels.csv --label-cols outcome
+latentverse expressiveness --representations reps.csv --labels labels.csv --label-cols score
+latentverse multimodal     --representations mod1.csv --representations2 mod2.csv \
+    --labels labels.csv --label-cols shared,specific
+```
+
+The tests are `clusterability`, `disentanglement`, `expressiveness`,
+`robustness`, and `probing`, plus `multimodal` for the two-modality decoupling.
+It reads `.csv`, `.tsv`, and `.npy`, writes one JSON document to stdout (pipe it
+into `jq`, or use `--out result.json --format json`), and keeps warnings on
+stderr. Run `latentverse <test> --help` to see the flags each one takes, such as
+`--seed`, `--standardize`, `--subsample`, `--n-clusters`, and `--noise-levels`.
+The command runs the same pipeline as the web app, so a given input gives the
+same numbers either way.
+
 ## API
 
 ```python
@@ -87,7 +113,7 @@ and, when `plots=True`, a `"plot_url"` (image path) or `"plot_data"` (raw
 arrays you can render however you want).
 
 For the full per-function signature and what each metric means,
-docstrings on the entrypoints are the source of truth — open
+docstrings on the entrypoints are the source of truth. Open
 `src/latentverse/evaluations/clustering.py` (or any other test file) and read
 the function header.
 
@@ -112,6 +138,9 @@ latentverse/                            (src-layout: real package lives in src/)
 ├── examples/run_cli.py                 end-to-end demo on synthetic data
 ├── src/latentverse/
 │   ├── __init__.py                     public re-exports
+│   ├── cli.py, __main__.py             the `latentverse` command
+│   ├── pipeline.py                     unimodal run pipeline (used by the CLI)
+│   ├── pipeline_multimodal.py          multimodal decoupling pipeline
 │   ├── utils.py                        shared helpers (encoding, MI, etc.)
 │   ├── evaluations/
 │   │   ├── clustering.py               run_clustering
@@ -122,7 +151,7 @@ latentverse/                            (src-layout: real package lives in src/)
 │   └── multiloreft/
 │       ├── multimodal_projector.py     MultiLoReFT
 │       └── losses.py
-└── tests/test_smoke.py                 contract / smoke tests
+└── tests/                              smoke, unit, e2e, and determinism suites
 ```
 
 ## License

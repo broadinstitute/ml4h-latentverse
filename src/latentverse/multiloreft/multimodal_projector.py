@@ -443,9 +443,9 @@ class MultiLoReFT(nn.Module):
     ):
         """Train the projection model with early stopping."""
         # Training artefact dir. Defaults to a writable path under /tmp so the
-        # non-root container user (uid 10001 in our Dockerfile) doesn't hit
+        # non-root container user doesn't hit
         # `PermissionError: [Errno 13] Permission denied: './logs'` when
-        # invoked from a read-only /app working directory on Cloud Run.
+        # invoked from a read-only working directory.
         # Override with MULTILOREFT_ARTIFACT_DIR if you want artefacts kept.
         artefact_dir = _os.getenv("MULTILOREFT_ARTIFACT_DIR", "/tmp/multiloreft")
         ckpts_dir = _os.path.join(artefact_dir, "ckpts")

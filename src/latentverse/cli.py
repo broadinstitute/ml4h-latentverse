@@ -19,8 +19,8 @@ Examples
         --id-col id --rep2-id-col id --labels labels.csv --label-cols disease \\
         --test-type clusterability
 
-Structure mirrors the web app's ``app/auth/cli.py``: subparsers, ``main(argv)``,
-integer exit codes.
+Structure mirrors the companion web application's command-line entrypoint:
+subparsers, ``main(argv)``, integer exit codes.
 """
 
 from __future__ import annotations

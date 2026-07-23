@@ -133,7 +133,7 @@ def get_n_jobs(default=2):
     can cap fan-out without editing code. It defaults to a small number rather
     than joblib's ``-1`` ("use every core") on purpose: the web app already
     runs up to ``cpu_count`` label columns concurrently, and if each of those
-    then grabbed every core the Cloud Run instance would oversubscribe its CPU
+    then grabbed every core the host would oversubscribe its CPU
     and BLAS thread pools and thrash. A small inner bound × the outer
     label-level cap keeps total concurrency sane.
 
