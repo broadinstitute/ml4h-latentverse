@@ -26,6 +26,12 @@ dependencies.
 ## Install
 
 ```bash
+pip install latentverse
+```
+
+Or install the current main branch straight from git:
+
+```bash
 pip install git+https://github.com/broadinstitute/ml4h-latentverse.git
 ```
 
@@ -41,10 +47,8 @@ Requires Python 3.9 or newer.
 
 > Note: the package was previously published on PyPI as
 > `ml4h-latentverse` (last release 0.1.2, March 2025) under an account
-> we no longer have access to. The repo lives on at the same URL; new
-> releases will go out as `latentverse` on PyPI under a fresh account.
-> Until that first PyPI release, install directly from git as shown
-> above.
+> we no longer have access to. That project is orphaned and no longer
+> updated. Releases now go out as `latentverse`.
 
 ## Quick example
 

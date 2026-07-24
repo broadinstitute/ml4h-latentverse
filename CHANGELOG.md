@@ -35,14 +35,12 @@ and the project aims for [Semantic Versioning](https://semver.org/).
   (was `ml4h_latentverse`).
   - Old: `from ml4h_latentverse import ...`
   - New: `from latentverse import ...`
-  - **Installation is from source** — the name `latentverse` is **not yet
-    published to PyPI**, so `pip install latentverse` does not work today.
-    Install from a checkout (`pip install .`, or `pip install -e ".[dev]"` for
-    development) or directly from the repository
+  - **Published to PyPI** under the new name: `pip install latentverse`.
+    You can also install from a checkout (`pip install .`, or
+    `pip install -e ".[dev]"` for development) or directly from the repository
     (`pip install "git+https://github.com/broadinstitute/ml4h-latentverse@<ref>"`).
     The previous PyPI project (`ml4h-latentverse`, last release 0.1.2) is
-    orphaned under an inaccessible account; a release under the new name is
-    planned but has not happened yet.
+    orphaned under an inaccessible account and is no longer updated.
 - **Submodule rename**: `ml4h_latentverse.tests` → `latentverse.evaluations`.
   The old name was misleading (these are public ML evaluation entrypoints,
   not unit tests of the library) and collided with the pytest convention.
